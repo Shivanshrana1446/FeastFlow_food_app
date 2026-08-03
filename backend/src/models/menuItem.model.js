@@ -15,6 +15,7 @@ const menuItemSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 150 },
     description: { type: String, trim: true, maxlength: 1000 },
     imageUrl: { type: String },
+    imagePublicId: { type: String }, // Cloudinary asset id, for deleting the old image on replace
     price: { type: Number, required: true, min: 0 },
     isVeg: { type: Boolean, default: true },
     isAvailable: { type: Boolean, default: true },

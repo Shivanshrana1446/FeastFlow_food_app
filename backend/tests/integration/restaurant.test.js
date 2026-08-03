@@ -134,6 +134,29 @@ describe('Restaurant module', () => {
     expect(res.status).toBe(403);
   });
 
+  it('updates a restaurant\'s location without wiping the GeoJSON type MongoDB needs for the 2dsphere index', async () => {
+    const { accessToken: ownerToken } = await registerUser(ROLES.RESTAURANT_OWNER);
+    const restaurantRes = await request(app)
+      .post('/api/v1/restaurants')
+      .set('Authorization', authHeader(ownerToken))
+      .send(restaurantPayload);
+    const restaurantId = restaurantRes.body.data._id;
+
+    // Mirrors what the owner dashboard's edit form actually sends: coordinates only, no `type`.
+    const res = await request(app)
+      .patch(`/api/v1/restaurants/${restaurantId}`)
+      .set('Authorization', authHeader(ownerToken))
+      .send({ location: { coordinates: [1, 1] } });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.location).toEqual({ type: 'Point', coordinates: [1, 1] });
+
+    // A `$nearSphere` query is what actually invokes the 2dsphere index — the true test that the
+    // geo key extracted correctly rather than merely that the field looks right in isolation.
+    const nearby = await request(app).get('/api/v1/restaurants').query({ lat: 1, lng: 1, radiusKm: 5 });
+    expect(nearby.status).toBe(200);
+  });
+
   it('supports filtering and searching menu items', async () => {
     const { accessToken: ownerToken } = await registerUser(ROLES.RESTAURANT_OWNER);
     const restaurantRes = await request(app)
@@ -193,8 +216,26 @@ describe('Restaurant module', () => {
       .attach('cover', FIXTURE_IMAGE);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.logoUrl).toEqual(expect.stringContaining('/uploads/restaurants/'));
-    expect(res.body.data.coverImageUrl).toEqual(expect.stringContaining('/uploads/restaurants/'));
+    expect(res.body.data.logoUrl).toEqual(expect.stringContaining('https://res.cloudinary.com/'));
+    expect(res.body.data.coverImageUrl).toEqual(expect.stringContaining('https://res.cloudinary.com/'));
+  });
+
+  it('rejects an image upload with no logo or cover file attached', async () => {
+    const { accessToken: ownerToken } = await registerUser(ROLES.RESTAURANT_OWNER);
+    const restaurantRes = await request(app)
+      .post('/api/v1/restaurants')
+      .set('Authorization', authHeader(ownerToken))
+      .send(restaurantPayload);
+    const restaurantId = restaurantRes.body.data._id;
+
+    const res = await request(app)
+      .patch(`/api/v1/restaurants/${restaurantId}/images`)
+      .set('Authorization', authHeader(ownerToken));
+
+    expect(res.status).toBe(400);
+
+    const unchanged = await request(app).get(`/api/v1/restaurants/${restaurantId}`);
+    expect(unchanged.body.data.logoUrl).toBeUndefined();
   });
 
   it("rejects an image upload from a restaurant owner who doesn't own the restaurant, before touching the file", async () => {

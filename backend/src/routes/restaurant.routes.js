@@ -24,7 +24,7 @@ const {
 } = require('../controllers/restaurant.controller');
 
 const router = express.Router();
-const uploadRestaurantImages = makeUploader('restaurants');
+const uploadRestaurantImages = makeUploader();
 
 router.get('/', validate({ query: listRestaurantsQuerySchema }), listRestaurants);
 

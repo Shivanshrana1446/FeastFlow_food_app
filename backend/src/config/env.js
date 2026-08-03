@@ -25,6 +25,14 @@ const envSchema = z
     // scripts/seedAdmin.js directly isn't an option.
     ADMIN_BOOTSTRAP_SECRET: z.string().min(16).optional(),
 
+    // Required in every environment — uploads (restaurant logo/cover, menu item images, avatars)
+    // go straight to Cloudinary with no local-disk fallback. Local disk storage was removed
+    // because it silently loses every file on Render's free tier (ephemeral filesystem: a
+    // redeploy or scale-to-zero wipes it), which is exactly what "production-ready" rules out.
+    CLOUDINARY_CLOUD_NAME: z.string().min(1, 'CLOUDINARY_CLOUD_NAME is required'),
+    CLOUDINARY_API_KEY: z.string().min(1, 'CLOUDINARY_API_KEY is required'),
+    CLOUDINARY_API_SECRET: z.string().min(1, 'CLOUDINARY_API_SECRET is required'),
+
     BCRYPT_SALT_ROUNDS: z.coerce.number().default(10),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
     RATE_LIMIT_MAX: z.coerce.number().default(200),

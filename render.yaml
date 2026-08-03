@@ -18,6 +18,13 @@ services:
         sync: false
       - key: CLIENT_URL
         sync: false
+      # From your Cloudinary dashboard (console.cloudinary.com) — required, no fallback.
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
       # Render generates a random value for each of these on first deploy —
       # view them under the service's Environment tab afterward.
       - key: JWT_ACCESS_SECRET

@@ -77,7 +77,7 @@ describe('Menu item module', () => {
       .attach('image', FIXTURE_IMAGE);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.imageUrl).toEqual(expect.stringContaining('/uploads/menu-items/'));
+    expect(res.body.data.imageUrl).toEqual(expect.stringContaining('https://res.cloudinary.com/'));
   });
 
   it("rejects an image upload from an owner who doesn't own the item's restaurant", async () => {

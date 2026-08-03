@@ -1,4 +1,3 @@
-const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -39,8 +38,6 @@ app.use(hpp());
 if (!env.isTest) {
   app.use(morgan('combined', { stream: logger.stream }));
 }
-
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 app.use(`/api/${env.API_VERSION}`, apiLimiter, routes);
 

@@ -25,6 +25,7 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, trim: true },
     role: { type: String, enum: ROLE_VALUES, default: ROLES.CUSTOMER, index: true },
     avatarUrl: { type: String },
+    avatarPublicId: { type: String }, // Cloudinary asset id, for deleting the old image on replace
     addresses: { type: [addressSchema], default: [] },
     isActive: { type: Boolean, default: true },
     isEmailVerified: { type: Boolean, default: false },
@@ -47,6 +48,7 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
   const obj = this.toObject();
   delete obj.password;
   delete obj.refreshTokenHash;
+  delete obj.avatarPublicId;
   delete obj.__v;
   return obj;
 };

@@ -21,7 +21,7 @@ const {
 } = require('../controllers/menuItem.controller');
 
 const router = express.Router();
-const uploadMenuItemImage = makeUploader('menu-items');
+const uploadMenuItemImage = makeUploader();
 
 router.get('/', validate({ query: listMenuItemsQuerySchema }), listMenuItems);
 router.get('/:id', validate({ params: idParamSchema }), getMenuItem);

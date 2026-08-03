@@ -1,5 +1,6 @@
 const User = require('../models/user.model');
 const ApiError = require('../utils/ApiError');
+const { destroyCloudinaryAsset } = require('../utils/cloudinaryUpload');
 const { ROLES } = require('../constants/roles');
 
 function assertSelfOrAdmin(requester, targetId) {
@@ -68,4 +69,16 @@ async function removeAddress(userId, addressId) {
   return user.toSafeJSON();
 }
 
-module.exports = { getUserById, updateProfile, addAddress, updateAddress, removeAddress };
+async function setAvatar(userId, { avatarUrl, avatarPublicId }) {
+  const user = await User.findById(userId);
+  if (!user) throw ApiError.notFound('User not found');
+
+  const staleAssetId = user.avatarPublicId;
+  user.avatarUrl = avatarUrl;
+  user.avatarPublicId = avatarPublicId;
+  await user.save();
+  await destroyCloudinaryAsset(staleAssetId);
+  return user.toSafeJSON();
+}
+
+module.exports = { getUserById, updateProfile, addAddress, updateAddress, removeAddress, setAvatar };

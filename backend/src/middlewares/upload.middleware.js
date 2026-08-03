@@ -1,27 +1,10 @@
-const fs = require('fs');
-const path = require('path');
 const multer = require('multer');
 const ApiError = require('../utils/ApiError');
 
-const UPLOAD_ROOT = path.join(process.cwd(), 'uploads');
-
-const storage = (subfolder) =>
-  multer.diskStorage({
-    destination: (req, file, cb) => {
-      const dir = path.join(UPLOAD_ROOT, subfolder);
-      fs.mkdirSync(dir, { recursive: true });
-      cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      const safeBase = path
-        .basename(file.originalname, ext)
-        .replace(/[^a-zA-Z0-9_-]/g, '')
-        .slice(0, 40);
-      cb(null, `${Date.now()}-${safeBase || 'file'}${ext}`);
-    },
-  });
-
+// Files are held only in memory for the lifetime of the request, then streamed straight to
+// Cloudinary (see utils/cloudinaryUpload.js) — nothing is ever written to local disk, so there's
+// nothing to clean up afterward and nothing for Render's ephemeral filesystem to lose on
+// redeploy/restart.
 const imageFileFilter = (req, file, cb) => {
   const allowed = ['image/jpeg', 'image/png', 'image/webp'];
   if (!allowed.includes(file.mimetype)) {
@@ -30,14 +13,11 @@ const imageFileFilter = (req, file, cb) => {
   return cb(null, true);
 };
 
-const makeUploader = (subfolder) =>
+const makeUploader = () =>
   multer({
-    storage: storage(subfolder),
+    storage: multer.memoryStorage(),
     fileFilter: imageFileFilter,
     limits: { fileSize: 2 * 1024 * 1024 },
   });
 
-/** Public URL path for a file saved by the uploader above. */
-const toPublicUrl = (subfolder, filename) => `/uploads/${subfolder}/${filename}`;
-
-module.exports = { makeUploader, toPublicUrl };
+module.exports = { makeUploader };

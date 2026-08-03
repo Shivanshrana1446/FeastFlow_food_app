@@ -21,6 +21,12 @@ const createRestaurantSchema = z.object({
   cuisine: z.array(z.string().trim().max(50)).max(20).default([]),
   address: addressSchema,
   location: z.object({
+    // Explicit + defaulted (not left to the Mongoose schema's default) because updateRestaurant
+    // does `Object.assign(restaurant, updates)`, which replaces the whole `location` subdocument
+    // wholesale — if `type` isn't in the validated body, it gets wiped from an existing
+    // restaurant, and MongoDB's 2dsphere index then fails to build a geo key at all ("Can't
+    // extract geo keys") because it can't tell what kind of geometry the coordinates describe.
+    type: z.literal('Point').default('Point'),
     coordinates: z.tuple([z.number(), z.number()]),
   }),
   openingHours: z.array(openingHourSchema).max(7).default([]),

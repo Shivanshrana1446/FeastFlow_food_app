@@ -20,7 +20,9 @@ const restaurantSchema = new mongoose.Schema(
     description: { type: String, trim: true, maxlength: 1000 },
     cuisine: { type: [String], default: [] },
     logoUrl: { type: String },
+    logoPublicId: { type: String }, // Cloudinary asset id, for deleting the old image on replace
     coverImageUrl: { type: String },
+    coverImagePublicId: { type: String },
     address: {
       line1: { type: String, required: true, trim: true },
       city: { type: String, required: true, trim: true },

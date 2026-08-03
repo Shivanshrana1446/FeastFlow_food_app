@@ -2,7 +2,8 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
 const ApiError = require('../utils/ApiError');
 const menuItemService = require('../services/menuItem.service');
-const { toPublicUrl } = require('../middlewares/upload.middleware');
+const { uploadBufferToCloudinary } = require('../utils/cloudinaryUpload');
+const { CLOUDINARY_FOLDERS } = require('../constants/uploadFolders');
 
 /**
  * @openapi
@@ -61,8 +62,8 @@ const deleteMenuItem = asyncHandler(async (req, res) => {
  */
 const uploadImage = asyncHandler(async (req, res) => {
   if (!req.file) throw ApiError.badRequest('Image file is required');
-  const imageUrl = toPublicUrl('menu-items', req.file.filename);
-  const item = await menuItemService.setImage(req.user, req.params.id, imageUrl);
+  const { url, publicId } = await uploadBufferToCloudinary(req.file.buffer, CLOUDINARY_FOLDERS.MENU_ITEMS);
+  const item = await menuItemService.setImage(req.user, req.params.id, { imageUrl: url, imagePublicId: publicId });
   new ApiResponse(200, item, 'Image updated').send(res);
 });
 

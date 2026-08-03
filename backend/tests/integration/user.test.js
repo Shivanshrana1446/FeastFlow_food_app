@@ -1,7 +1,10 @@
+const path = require('path');
 const request = require('supertest');
 const app = require('../../src/app');
 const { registerUser, authHeader } = require('../helpers/auth');
 const { ROLES } = require('../../src/constants/roles');
+
+const FIXTURE_IMAGE = path.join(__dirname, '../fixtures/tiny.png');
 
 describe('User profile module', () => {
   it('lets a user fetch and update their own profile', async () => {
@@ -73,5 +76,29 @@ describe('User profile module', () => {
       .set('Authorization', authHeader(accessToken))
       .send({ line1: '' });
     expect(res.status).toBe(400);
+  });
+
+  it('uploads a profile avatar', async () => {
+    const { accessToken } = await registerUser(ROLES.CUSTOMER);
+
+    const res = await request(app)
+      .patch('/api/v1/users/me/avatar')
+      .set('Authorization', authHeader(accessToken))
+      .attach('avatar', FIXTURE_IMAGE);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.avatarUrl).toEqual(expect.stringContaining('https://res.cloudinary.com/'));
+    expect(res.body.data.avatarPublicId).toBeUndefined();
+  });
+
+  it('rejects an avatar upload with no file attached', async () => {
+    const { accessToken } = await registerUser(ROLES.CUSTOMER);
+    const res = await request(app).patch('/api/v1/users/me/avatar').set('Authorization', authHeader(accessToken));
+    expect(res.status).toBe(400);
+  });
+
+  it('requires authentication to upload an avatar', async () => {
+    const res = await request(app).patch('/api/v1/users/me/avatar');
+    expect(res.status).toBe(401);
   });
 });

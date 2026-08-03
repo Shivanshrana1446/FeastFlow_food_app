@@ -6,4 +6,6 @@ export const userApi = {
   addAddress: (payload) => unwrap(axiosClient.post('/users/me/addresses', payload)),
   updateAddress: (addressId, payload) => unwrap(axiosClient.patch(`/users/me/addresses/${addressId}`, payload)),
   removeAddress: (addressId) => unwrap(axiosClient.delete(`/users/me/addresses/${addressId}`)),
+  // No manual Content-Type here — see the comment on restaurantApi.uploadImages for why.
+  uploadAvatar: (formData) => unwrap(axiosClient.patch('/users/me/avatar', formData)),
 };

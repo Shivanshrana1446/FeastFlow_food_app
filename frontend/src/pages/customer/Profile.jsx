@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -31,6 +31,8 @@ export default function Profile() {
   const [savingAddress, setSavingAddress] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef(null);
 
   const {
     register,
@@ -68,6 +70,23 @@ export default function Profile() {
     }
   };
 
+  const handleAvatarChange = async (file) => {
+    if (!file) return;
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      const updated = await userApi.uploadAvatar(formData);
+      dispatch(updateCurrentUser(updated));
+      notify('Profile photo updated', 'success');
+    } catch (err) {
+      notify(errorMessage(err), 'error');
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
+  };
+
   const handleDeleteAddress = async () => {
     setDeleting(true);
     try {
@@ -88,7 +107,25 @@ export default function Profile() {
 
       <Card className="p-6">
         <div className="flex items-center gap-4">
-          <Avatar name={user?.name} src={user?.avatarUrl} size="lg" />
+          <div className="relative shrink-0">
+            <Avatar name={user?.name} src={user?.avatarUrl} size="lg" />
+            <button
+              type="button"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={uploadingAvatar}
+              aria-label="Change profile photo"
+              className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-brand-500 text-white shadow-soft hover:bg-brand-600 disabled:opacity-60"
+            >
+              <Icon name={uploadingAvatar ? 'spinner' : 'edit'} className={`h-3.5 w-3.5 ${uploadingAvatar ? 'animate-spin' : ''}`} />
+            </button>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => handleAvatarChange(e.target.files[0])}
+            />
+          </div>
           <div>
             <p className="font-display text-lg font-bold text-ink-900">{user?.name}</p>
             <p className="text-sm text-ink-500">{user?.email}</p>

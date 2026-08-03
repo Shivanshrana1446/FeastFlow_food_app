@@ -8,12 +8,11 @@ export const restaurantApi = {
   create: (payload) => unwrap(axiosClient.post('/restaurants', payload)),
   update: (id, payload) => unwrap(axiosClient.patch(`/restaurants/${id}`, payload)),
   remove: (id) => unwrap(axiosClient.delete(`/restaurants/${id}`)),
-  uploadImages: (id, formData) =>
-    unwrap(
-      axiosClient.patch(`/restaurants/${id}/images`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-    ),
+  // No explicit Content-Type here — axios's XHR adapter (the one browsers actually use) does not
+  // append a boundary to a manually-set 'multipart/form-data' header, which busboy/multer then
+  // reject outright ("Multipart: Boundary not found"). Omitting the header lets the browser set
+  // 'multipart/form-data; boundary=...' itself when it sees a FormData body.
+  uploadImages: (id, formData) => unwrap(axiosClient.patch(`/restaurants/${id}/images`, formData)),
   getDashboard: (id) => unwrap(axiosClient.get(`/restaurants/${id}/dashboard`)),
 
   listCategories: (restaurantId) => unwrap(axiosClient.get('/categories', { params: { restaurant: restaurantId } })),

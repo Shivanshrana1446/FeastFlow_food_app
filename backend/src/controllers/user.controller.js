@@ -1,6 +1,9 @@
 const asyncHandler = require('../utils/asyncHandler');
+const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const userService = require('../services/user.service');
+const { uploadBufferToCloudinary } = require('../utils/cloudinaryUpload');
+const { CLOUDINARY_FOLDERS } = require('../constants/uploadFolders');
 
 /**
  * @openapi
@@ -54,4 +57,18 @@ const removeAddress = asyncHandler(async (req, res) => {
   new ApiResponse(200, user, 'Address removed').send(res);
 });
 
-module.exports = { getUser, updateUser, addAddress, updateAddress, removeAddress };
+/**
+ * @openapi
+ * /users/me/avatar:
+ *   patch:
+ *     summary: Upload/replace the current user's profile picture
+ *     tags: [Users]
+ */
+const uploadAvatar = asyncHandler(async (req, res) => {
+  if (!req.file) throw ApiError.badRequest('Image file is required');
+  const { url, publicId } = await uploadBufferToCloudinary(req.file.buffer, CLOUDINARY_FOLDERS.AVATARS);
+  const user = await userService.setAvatar(req.user._id, { avatarUrl: url, avatarPublicId: publicId });
+  new ApiResponse(200, user, 'Avatar updated').send(res);
+});
+
+module.exports = { getUser, updateUser, addAddress, updateAddress, removeAddress, uploadAvatar };

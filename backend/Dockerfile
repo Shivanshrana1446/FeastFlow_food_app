@@ -13,7 +13,7 @@ ENV NODE_ENV=production
 WORKDIR /usr/src/app
 COPY --from=dependencies /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app ./
-RUN mkdir -p logs uploads
+RUN mkdir -p logs
 EXPOSE 5000
 USER node
 CMD ["node", "src/server.js"]

@@ -6,10 +6,6 @@ export const menuApi = {
   create: (payload) => unwrap(axiosClient.post('/menu-items', payload)),
   update: (id, payload) => unwrap(axiosClient.patch(`/menu-items/${id}`, payload)),
   remove: (id) => unwrap(axiosClient.delete(`/menu-items/${id}`)),
-  uploadImage: (id, formData) =>
-    unwrap(
-      axiosClient.patch(`/menu-items/${id}/image`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-    ),
+  // See the comment on restaurantApi.uploadImages — no manual Content-Type here either.
+  uploadImage: (id, formData) => unwrap(axiosClient.patch(`/menu-items/${id}/image`, formData)),
 };

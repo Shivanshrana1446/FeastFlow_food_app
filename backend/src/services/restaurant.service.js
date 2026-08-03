@@ -4,6 +4,7 @@ const MenuItem = require('../models/menuItem.model');
 const Order = require('../models/order.model');
 const ApiError = require('../utils/ApiError');
 const paginate = require('../utils/paginate');
+const { destroyCloudinaryAsset } = require('../utils/cloudinaryUpload');
 const { ROLES } = require('../constants/roles');
 const { ORDER_STATUS } = require('../constants/orderStatus');
 
@@ -44,13 +45,13 @@ async function listRestaurants(query) {
     };
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(100, Math.max(1, limit));
-    const [results, totalItems] = await Promise.all([
-      Restaurant.find(filter)
-        .skip((safePage - 1) * safeLimit)
-        .limit(safeLimit)
-        .lean(),
-      Restaurant.countDocuments(filter),
-    ]);
+    // countDocuments() runs $nearSphere through an aggregation pipeline internally, and MongoDB
+    // rejects $near/$nearSphere there ("not allowed in this context") — it's a find()-only
+    // operator. Radius search is inherently bounded (max 50km, validated in the query schema),
+    // so fetching every match and paginating in memory is simple and correct here.
+    const allResults = await Restaurant.find(filter).lean();
+    const totalItems = allResults.length;
+    const results = allResults.slice((safePage - 1) * safeLimit, (safePage - 1) * safeLimit + safeLimit);
     return {
       results,
       meta: { page: safePage, limit: safeLimit, totalItems, totalPages: Math.max(1, Math.ceil(totalItems / safeLimit)) },
@@ -120,9 +121,21 @@ async function setImages(requester, id, images) {
   if (!restaurant) throw ApiError.notFound('Restaurant not found');
   assertOwnerOrAdmin(requester, restaurant);
 
-  if (images.logoUrl) restaurant.logoUrl = images.logoUrl;
-  if (images.coverImageUrl) restaurant.coverImageUrl = images.coverImageUrl;
+  const staleAssetIds = [];
+  if (images.logoUrl) {
+    if (restaurant.logoPublicId) staleAssetIds.push(restaurant.logoPublicId);
+    restaurant.logoUrl = images.logoUrl;
+    restaurant.logoPublicId = images.logoPublicId;
+  }
+  if (images.coverImageUrl) {
+    if (restaurant.coverImagePublicId) staleAssetIds.push(restaurant.coverImagePublicId);
+    restaurant.coverImageUrl = images.coverImageUrl;
+    restaurant.coverImagePublicId = images.coverImagePublicId;
+  }
   await restaurant.save();
+  // Delete old Cloudinary assets only after the new ones are safely persisted — never risk
+  // orphaning a restaurant with no image because a mid-request failure deleted the old one first.
+  await Promise.all(staleAssetIds.map(destroyCloudinaryAsset));
   return restaurant;
 }
 

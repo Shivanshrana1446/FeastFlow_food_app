@@ -3,6 +3,7 @@ const Category = require('../models/category.model');
 const Restaurant = require('../models/restaurant.model');
 const ApiError = require('../utils/ApiError');
 const paginate = require('../utils/paginate');
+const { destroyCloudinaryAsset } = require('../utils/cloudinaryUpload');
 const { assertRestaurantOwnership } = require('./category.service');
 
 async function createMenuItem(requester, data) {
@@ -81,13 +82,16 @@ async function deleteMenuItem(requester, id) {
   await item.deleteOne();
 }
 
-async function setImage(requester, id, imageUrl) {
+async function setImage(requester, id, { imageUrl, imagePublicId }) {
   const item = await MenuItem.findById(id);
   if (!item) throw ApiError.notFound('Menu item not found');
   await assertRestaurantOwnership(requester, item.restaurant);
 
+  const staleAssetId = item.imagePublicId;
   item.imageUrl = imageUrl;
+  item.imagePublicId = imagePublicId;
   await item.save();
+  await destroyCloudinaryAsset(staleAssetId);
   return item;
 }
 

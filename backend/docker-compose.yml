@@ -24,12 +24,14 @@ services:
       AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-20}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ADMIN_BOOTSTRAP_SECRET: ${ADMIN_BOOTSTRAP_SECRET:-}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:?Set CLOUDINARY_CLOUD_NAME in your .env file}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:?Set CLOUDINARY_API_KEY in your .env file}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:?Set CLOUDINARY_API_SECRET in your .env file}
     depends_on:
       mongo:
         condition: service_healthy
     volumes:
       - ./logs:/usr/src/app/logs
-      - ./uploads:/usr/src/app/uploads
     healthcheck:
       test:
         [

@@ -1,7 +1,9 @@
 const asyncHandler = require('../utils/asyncHandler');
+const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const restaurantService = require('../services/restaurant.service');
-const { toPublicUrl } = require('../middlewares/upload.middleware');
+const { uploadBufferToCloudinary } = require('../utils/cloudinaryUpload');
+const { CLOUDINARY_FOLDERS } = require('../constants/uploadFolders');
 
 /**
  * @openapi
@@ -85,9 +87,23 @@ const deleteRestaurant = asyncHandler(async (req, res) => {
  *     tags: [Restaurants]
  */
 const uploadImages = asyncHandler(async (req, res) => {
+  const logoFile = req.files?.logo?.[0];
+  const coverFile = req.files?.cover?.[0];
+  if (!logoFile && !coverFile) {
+    throw ApiError.badRequest('At least one image file (logo or cover) is required');
+  }
+
   const images = {};
-  if (req.files?.logo?.[0]) images.logoUrl = toPublicUrl('restaurants', req.files.logo[0].filename);
-  if (req.files?.cover?.[0]) images.coverImageUrl = toPublicUrl('restaurants', req.files.cover[0].filename);
+  if (logoFile) {
+    const { url, publicId } = await uploadBufferToCloudinary(logoFile.buffer, CLOUDINARY_FOLDERS.RESTAURANTS);
+    images.logoUrl = url;
+    images.logoPublicId = publicId;
+  }
+  if (coverFile) {
+    const { url, publicId } = await uploadBufferToCloudinary(coverFile.buffer, CLOUDINARY_FOLDERS.RESTAURANTS);
+    images.coverImageUrl = url;
+    images.coverImagePublicId = publicId;
+  }
 
   const restaurant = await restaurantService.setImages(req.user, req.params.id, images);
   new ApiResponse(200, restaurant, 'Images updated').send(res);

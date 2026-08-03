@@ -1,0 +1,129 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+
+  /* Micro-text for badge counters and dense meta rows — the one size below `text-xs`. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
+  /* Brand — warm coral/orange, the primary call-to-action color */
+  --color-brand-50: #fff3ee;
+  --color-brand-100: #ffe4d8;
+  --color-brand-200: #ffc7b0;
+  --color-brand-300: #ffa37d;
+  --color-brand-400: #ff7a4d;
+  --color-brand-500: #ff4d2d;
+  --color-brand-600: #f53a1b;
+  --color-brand-700: #cc2c11;
+  --color-brand-800: #a32712;
+  --color-brand-900: #852413;
+
+  /* Ink — near-black neutrals for text and dark surfaces */
+  --color-ink-50: #f7f7f8;
+  --color-ink-100: #eeeef1;
+  --color-ink-200: #dddee3;
+  --color-ink-300: #c3c5cd;
+  --color-ink-400: #9a9da8;
+  --color-ink-500: #71747f;
+  --color-ink-600: #52545f;
+  --color-ink-700: #3d3f49;
+  --color-ink-800: #24252c;
+  --color-ink-900: #15161b;
+  --color-ink-950: #0b0b0e;
+
+  /* Status colors used across order/restaurant/payment states */
+  --color-success-50: #ecfdf3;
+  --color-success-200: #abefc6;
+  --color-success-500: #12b76a;
+  --color-success-700: #027a48;
+
+  --color-warning-50: #fffaeb;
+  --color-warning-200: #fedf89;
+  --color-warning-500: #f79009;
+  --color-warning-700: #b54708;
+
+  --color-danger-50: #fef3f2;
+  --color-danger-200: #fecdca;
+  --color-danger-500: #f04438;
+  --color-danger-700: #b42318;
+
+  --color-info-50: #eff8ff;
+  --color-info-200: #b2ddff;
+  --color-info-500: #2e90fa;
+  --color-info-700: #175cd3;
+
+  --shadow-soft: 0 1px 2px rgba(11, 11, 14, 0.04), 0 1px 3px rgba(11, 11, 14, 0.06);
+  --shadow-card: 0 2px 8px rgba(11, 11, 14, 0.06), 0 8px 24px rgba(11, 11, 14, 0.06);
+  --shadow-lifted: 0 12px 32px rgba(11, 11, 14, 0.12), 0 4px 12px rgba(11, 11, 14, 0.08);
+
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes shimmer {
+    0% {
+      background-position: -400px 0;
+    }
+    100% {
+      background-position: 400px 0;
+    }
+  }
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-ink-50 text-ink-800;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    @apply tracking-tight;
+    /* No default color here — headings inherit from their container so they
+       still read correctly on dark/colored sections (text-white parents etc).
+       Light-background usages set text-ink-900 explicitly. */
+  }
+
+  ::selection {
+    @apply bg-brand-200 text-ink-900;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+}
+
+@layer utilities {
+  .skeleton {
+    background-image: linear-gradient(90deg, var(--color-ink-100) 0px, var(--color-ink-200) 40px, var(--color-ink-100) 80px);
+    background-size: 600px 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+}

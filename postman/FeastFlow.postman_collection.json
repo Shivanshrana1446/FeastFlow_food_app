@@ -314,6 +314,58 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Bootstrap Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/bootstrap-admin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "bootstrap-admin"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Creates (or promotes) an admin account. Disabled unless ADMIN_BOOTSTRAP_SECRET is set on the backend — set bootstrapSecret in this environment to that same value first.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Site Admin\",\n  \"email\": \"admin@example.com\",\n  \"password\": \"SuperSecret123\",\n  \"secret\": \"{{bootstrapSecret}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.environment.set('adminAccessToken', json.data.accessToken);",
+                  "  pm.environment.set('userId', json.data.user._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

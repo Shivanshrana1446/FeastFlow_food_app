@@ -23,6 +23,7 @@ services:
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-200}
       AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-20}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      ADMIN_BOOTSTRAP_SECRET: ${ADMIN_BOOTSTRAP_SECRET:-}
     depends_on:
       mongo:
         condition: service_healthy

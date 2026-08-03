@@ -20,6 +20,11 @@ const envSchema = z
     JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
     JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
+    // Gates POST /auth/bootstrap-admin — unset/undefined disables the endpoint entirely.
+    // Meant for platforms without shell access (e.g. Render's free tier) where running
+    // scripts/seedAdmin.js directly isn't an option.
+    ADMIN_BOOTSTRAP_SECRET: z.string().min(16).optional(),
+
     BCRYPT_SALT_ROUNDS: z.coerce.number().default(10),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
     RATE_LIMIT_MAX: z.coerce.number().default(200),

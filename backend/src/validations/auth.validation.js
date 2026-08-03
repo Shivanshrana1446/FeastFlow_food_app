@@ -18,4 +18,11 @@ const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1).optional(),
 });
 
-module.exports = { registerSchema, loginSchema, refreshTokenSchema };
+const bootstrapAdminSchema = z.object({
+  name: z.string().trim().min(2).max(100),
+  email: z.string().trim().email(),
+  password: z.string().min(8).max(128),
+  secret: z.string().min(1, 'Bootstrap secret is required'),
+});
+
+module.exports = { registerSchema, loginSchema, refreshTokenSchema, bootstrapAdminSchema };

@@ -42,6 +42,7 @@ const DeliveryTracking = lazy(() => import('@/pages/delivery/DeliveryTracking'))
 const DeliveryHistory = lazy(() => import('@/pages/delivery/History'));
 
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
+const AdminCustomers = lazy(() => import('@/pages/admin/Customers'));
 const AdminUsers = lazy(() => import('@/pages/admin/Users'));
 const AdminRestaurants = lazy(() => import('@/pages/admin/Restaurants'));
 const AdminOrders = lazy(() => import('@/pages/admin/Orders'));
@@ -118,6 +119,7 @@ export default function App() {
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<Navigate to="dashboard" replace />} />
                   <Route path="dashboard" element={<AdminDashboard />} />
+                  <Route path="customers" element={<AdminCustomers />} />
                   <Route path="users" element={<AdminUsers />} />
                   <Route path="restaurants" element={<AdminRestaurants />} />
                   <Route path="orders" element={<AdminOrders />} />

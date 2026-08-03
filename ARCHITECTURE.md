@@ -2,7 +2,7 @@
 
 Status: **Full stack, fully integrated, production-reviewed.** Every module below is implemented
 end-to-end across all four roles (Customer, Restaurant Owner, Delivery Partner, Admin) — backend
-services, controllers, validators, RBAC, pagination/search/sort, Swagger docs, an 84-test Jest +
+services, controllers, validators, RBAC, pagination/search/sort, Swagger docs, an 89-test Jest +
 Supertest integration suite, and a React 19 + Vite frontend (47 Vitest + React Testing Library
 tests) wired to every endpoint, plus notifications, a mock payment gateway, and full Docker
 Compose orchestration verified with real container builds and health checks. See the root
@@ -124,7 +124,7 @@ foof_p/
 │   │   │   ├── orderPricing.test.js
 │   │   │   ├── mockPaymentGateway.test.js
 │   │   │   └── orderStateMachine.test.js
-│   │   ├── integration/                 # one file per resource — 84 tests total
+│   │   ├── integration/                 # one file per resource — 89 tests total
 │   │   │   ├── health.test.js
 │   │   │   ├── auth.test.js
 │   │   │   ├── user.test.js
@@ -135,6 +135,7 @@ foof_p/
 │   │   │   ├── payment.test.js
 │   │   │   ├── delivery.test.js         # includes concurrent-accept race-condition tests
 │   │   │   ├── notification.test.js
+│   │   │   ├── bootstrapAdmin.test.js   # secret-gated admin creation/promotion over HTTP
 │   │   │   └── admin.test.js
 │   │   └── setup.js
 │   ├── logs/                          # winston file transport backup (gitignored; stdout is primary)
@@ -410,8 +411,10 @@ admin is granted a bypass in each service's ownership check (`assertOwnerOrAdmin
 `assertOrderAccess`) rather than duplicating separate `/admin/*` CRUD routes for resources that
 already support role-based access.
 
-There is deliberately no `POST /auth/register` path to the `admin` role (see §6) — the first
-admin account is created with `backend/scripts/seedAdmin.js`, documented in the root README.
+There is deliberately no `POST /auth/register` path to the `admin` role (see §6) — the first admin
+account is created either with `backend/scripts/seedAdmin.js` (needs shell access) or `POST
+/auth/bootstrap-admin` (a secret-gated HTTP alternative for platforms that don't offer one, e.g.
+Render's free tier), both documented in the root README.
 
 ---
 
@@ -457,6 +460,12 @@ because controllers are wrapped in `asyncHandler`.
   checks (e.g. "this restaurant belongs to this owner") happen in the **service layer**
   (`assertOwnerOrAdmin`, `assertOrderAccess`, `assertRestaurantOwnership`), since those require a
   DB lookup that RBAC middleware — which only inspects the JWT payload — shouldn't own.
+- **Admin bootstrap** (`POST /auth/bootstrap-admin`): the only way to obtain an `admin` role
+  outside direct DB access, and it's off by default — `auth.controller.js` compares the request's
+  `secret` field against `env.ADMIN_BOOTSTRAP_SECRET` with `crypto.timingSafeEqual` (constant-time,
+  to avoid a timing side-channel on the comparison) and 403s unconditionally if that env var isn't
+  set. On a secret match it creates a new admin or promotes an existing account by email —
+  matching-by-email promotion never touches the target account's password.
 
 ---
 

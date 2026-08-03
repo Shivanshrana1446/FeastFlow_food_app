@@ -4,7 +4,7 @@ A full-stack, production-reviewed food ordering platform for four roles — **Cu
 **Restaurant Owner**, **Delivery Partner**, and **Admin** — built as a MERN monorepo.
 
 - **Backend**: Node.js, Express, MongoDB/Mongoose, JWT auth with rotating refresh tokens, Zod
-  validation, Winston logging (stdout + file), Swagger docs, 84 Jest + Supertest tests, Dockerized.
+  validation, Winston logging (stdout + file), Swagger docs, 89 Jest + Supertest tests, Dockerized.
 - **Frontend**: React 19, Vite, Tailwind CSS v4, Redux Toolkit, Axios, React Hook Form + Zod,
   Framer Motion, role-based protected routing, 47 Vitest + React Testing Library tests — a
   hand-rolled component library, no UI kit.
@@ -59,7 +59,7 @@ foof_p/
 │   ├── src/                 # config, constants, models, middlewares, validations, services,
 │   │                        # controllers, routes — see ARCHITECTURE.md §1 for the full tree
 │   ├── scripts/seedAdmin.js # Bootstraps the first admin account (see below)
-│   ├── tests/               # Jest + Supertest — 84 tests, unit + integration
+│   ├── tests/               # Jest + Supertest — 89 tests, unit + integration
 │   ├── Dockerfile
 │   └── docker-compose.yml   # Backend + Mongo only (no frontend) — for API-only development
 └── frontend/                 # React 19 + Vite SPA
@@ -111,6 +111,7 @@ Key variables:
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | backend | Must be ≥32 chars, random, and **different from each other** (`openssl rand -base64 48`) |
 | `JWT_ACCESS_EXPIRES_IN` / `JWT_REFRESH_EXPIRES_IN` | backend | Token lifetimes (defaults: `15m` / `7d`) |
 | `CLIENT_URL` | backend | Origin allowed by CORS — must match where the frontend is served from |
+| `ADMIN_BOOTSTRAP_SECRET` | backend | Optional. Set it to enable `POST /auth/bootstrap-admin` for creating the first admin account over HTTP (see [Creating an admin account](#creating-an-admin-account)). Unset = endpoint disabled |
 | `VITE_API_URL` | frontend | Base URL the browser calls for the API. **Baked in at build time** (Vite), not read at runtime — rebuild the frontend image if this changes |
 | `PORT` / `FRONTEND_PORT` | root (compose) | Host ports the API and frontend are published on |
 
@@ -132,19 +133,42 @@ Visit `http://localhost:5173`. Swagger UI is at `http://localhost:5000/docs`.
 
 ### Creating an admin account
 
-Admins can't self-register through the public API by design — there's no "become an admin"
-endpoint (see [ARCHITECTURE.md §6](./ARCHITECTURE.md#6-authentication-strategy)). Bootstrap the
-first one with the seed script instead:
+Admins can't self-register through the signup form by design — there's no public "become an
+admin" option (see [ARCHITECTURE.md §6](./ARCHITECTURE.md#6-authentication-strategy)). Two ways to
+create one, depending on whether you have shell access to the backend:
+
+**Option A — HTTP endpoint (no shell access needed; use this for Render, or anywhere you can't run
+a script directly).** Set `ADMIN_BOOTSTRAP_SECRET` to a long random value
+(`openssl rand -base64 32`) in the backend's environment, then call:
+
+```bash
+curl -X POST https://your-backend.onrender.com/api/v1/auth/bootstrap-admin \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Site Admin",
+    "email": "admin@example.com",
+    "password": "a-strong-password",
+    "secret": "the-ADMIN_BOOTSTRAP_SECRET-value-you-set"
+  }'
+```
+
+It responds exactly like login/register — an admin user plus an access token, so you're logged in
+immediately. It's idempotent and secret-gated with a constant-time comparison: safe to re-run, it
+creates the admin if missing or promotes an existing account with that email to `admin` without
+touching that account's password. Leaving `ADMIN_BOOTSTRAP_SECRET` unset disables the endpoint
+entirely (it always 403s) — worth doing once you've created the admin(s) you need, since the
+secret is effectively a root credential for as long as it's set.
+
+**Option B — seed script (when you do have shell access, e.g. local dev or Docker):**
 
 ```bash
 cd backend
 ADMIN_NAME="Site Admin" ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD="a-strong-password" npm run seed:admin
 ```
 
-It's idempotent — safe to re-run; it creates the admin if missing, or promotes an existing user
-with that email to `admin` if they already registered normally. Under Docker, run it inside the
-running backend container instead: `docker compose exec backend node scripts/seedAdmin.js` (with
-the same env vars passed via `-e`).
+Same idempotent create-or-promote behavior. Under Docker, run it inside the running backend
+container instead: `docker compose exec backend node scripts/seedAdmin.js` (with the same env vars
+passed via `-e`).
 
 ## Running with Docker
 
@@ -189,7 +213,7 @@ Base path: `/api/v1`. Every list endpoint supports **pagination** (`page`, `limi
 
 | Resource | Endpoints | Roles |
 |---|---|---|
-| Auth | `POST /auth/register`, `/login`, `/refresh-token`, `/logout`; `GET /auth/me` | public / authenticated |
+| Auth | `POST /auth/register`, `/login`, `/refresh-token`, `/logout`; `GET /auth/me`; `POST /auth/bootstrap-admin` (secret-gated, disabled unless configured) | public / authenticated |
 | Users | `GET/PATCH /users/:id`; `POST/PATCH/DELETE /users/me/addresses[/:id]` | self, admin |
 | Restaurants | `GET /restaurants` (search, filter, geo), `/restaurants/mine`, `/:id`, `/:id/menu`; `POST/PATCH/DELETE /restaurants[/:id]`; `PATCH /:id/images`; `GET /:id/dashboard` | public / owner, admin |
 | Categories | `GET /categories?restaurant=:id`; `POST/PATCH/DELETE /categories[/:id]` | public / owner, admin |
@@ -227,8 +251,10 @@ Base path: `/api/v1`. Every list endpoint supports **pagination** (`page`, `limi
    etc.), and set the environment variables from the table above — especially `CLIENT_URL`
    pointing at your real frontend domain (CORS rejects requests otherwise, and the app now fails
    to start in production if `CLIENT_URL` is missing).
-4. **Bootstrap the first admin**: after the backend is up, run `seedAdmin.js` once (see above) —
-   there is no admin account until you do this.
+4. **Bootstrap the first admin**: after the backend is up, either call `POST
+   /auth/bootstrap-admin` or run `seedAdmin.js` once (see [above](#creating-an-admin-account)) —
+   there is no admin account until you do this. On platforms with no shell access (Render's free
+   tier, for example), the HTTP endpoint is the only option of the two that works.
 5. **Frontend**: build with the production API URL baked in: `docker build --build-arg
    VITE_API_URL=https://api.yourdomain.com/api/v1 -t your-registry/feastflow-frontend
    ./frontend`, then deploy the resulting Nginx image (or deploy `frontend/dist` to any static
@@ -251,7 +277,7 @@ Base path: `/api/v1`. Every list endpoint supports **pagination** (`page`, `limi
 
 ```bash
 cd backend
-npm test               # full suite: 84 tests across 15 suites
+npm test               # full suite: 89 tests across 16 suites
 npm run test:coverage  # with a coverage report
 ```
 
@@ -296,7 +322,8 @@ There is currently no automated browser (Playwright/Cypress) suite — see
 | Frontend calls fail with CORS errors | `CLIENT_URL` on the backend doesn't match the frontend's actual origin |
 | Frontend calls hit the wrong API URL after a Docker rebuild | `VITE_API_URL` is a build-time value — rebuild the frontend image, don't just restart the container |
 | `docker compose up` fails immediately on `backend` | Root `.env` is missing `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` — compose is configured to fail fast rather than silently run with an insecure default |
-| Can't log in as admin | No admin exists yet on a fresh database — run `npm run seed:admin` (see above) |
+| Can't log in as admin | No admin exists yet on a fresh database — call `POST /auth/bootstrap-admin` or run `npm run seed:admin` (see [above](#creating-an-admin-account)) |
+| `POST /auth/bootstrap-admin` always returns 403 | `ADMIN_BOOTSTRAP_SECRET` isn't set on the backend, or the `secret` field in your request doesn't match it exactly |
 | Checkout randomly fails with "Payment failed" | Expected — the mock payment gateway simulates an ~8% decline rate for non-Cash-on-Delivery methods; just retry |
 | Image uploads 400 | Only JPEG/PNG/WEBP under 2MB are accepted (`middlewares/upload.middleware.js`) |
 | `docker compose logs backend` shows nothing | Fixed in this pass — older images only logged to a file in production; rebuild the backend image to pick up stdout logging |

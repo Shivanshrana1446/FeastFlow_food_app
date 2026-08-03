@@ -91,4 +91,14 @@ describe('Auth flow', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });
+
+  it('disables /auth/bootstrap-admin entirely when ADMIN_BOOTSTRAP_SECRET is not configured', async () => {
+    const res = await request(app).post('/api/v1/auth/bootstrap-admin').send({
+      name: 'Should Not Work',
+      email: 'should-not-work@example.com',
+      password: 'SuperSecret123',
+      secret: 'any-value-at-all',
+    });
+    expect(res.status).toBe(403);
+  });
 });

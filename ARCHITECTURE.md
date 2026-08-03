@@ -169,7 +169,8 @@ foof_p/
     │   ├── test/setup.js              # Vitest + jest-dom setup
     │   └── utils/                     # format.js, constants.js
     ├── Dockerfile                     # multi-stage: vite build -> nginx-unprivileged
-    ├── nginx.conf
+    ├── nginx.conf                     # SPA fallback (try_files -> index.html) + security headers
+    ├── vercel.json                    # same SPA fallback + headers, for the Vercel deploy target
     └── package.json
 ```
 

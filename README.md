@@ -73,7 +73,8 @@ foof_p/
     │   ├── routes/              # ProtectedRoute / RoleRoute guards
     │   └── test/                 # Vitest setup
     ├── Dockerfile               # multi-stage: vite build -> nginx-unprivileged
-    └── nginx.conf
+    ├── nginx.conf               # SPA fallback + security headers for the Docker deploy
+    └── vercel.json              # same SPA fallback + headers, for the Vercel deploy
 ```
 
 Full annotated tree (every file, with its responsibility): **[ARCHITECTURE.md §1](./ARCHITECTURE.md#1-monorepo-folder-structure)**.
@@ -294,7 +295,12 @@ the backend needs the frontend's final URL for CORS:
 3. **Frontend on Vercel**: **Add New → Project** → import the same repo → set **Root Directory** to
    `frontend` (Vercel auto-detects the Vite framework preset from there) → under **Environment
    Variables** add `VITE_API_URL` = `https://<your-render-service>.onrender.com/api/v1` (must be
-   set *before* the first build — Vite bakes it in at build time) → Deploy.
+   set *before* the first build — Vite bakes it in at build time) → Deploy. `frontend/vercel.json`
+   is what makes deep links and page refreshes work — without it, refreshing on `/restaurants` or
+   any other client-side route 404s, because Vercel's static server looks for a literal
+   `restaurants` file/folder instead of falling back to `index.html` and letting React Router
+   handle it (the same problem `nginx.conf`'s `try_files ... /index.html` solves for the Docker
+   deploy).
 4. **Close the CORS loop**: back on Render, set the backend's `CLIENT_URL` to the Vercel URL from
    step 3 (e.g. `https://feastflow.vercel.app`) and trigger a redeploy (Render redeploys
    automatically on an env var change for most plans; use **Manual Deploy** if not).

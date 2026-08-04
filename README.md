@@ -33,14 +33,14 @@ strategy, and the order/delivery state machine), see **[ARCHITECTURE.md](./ARCHI
 
 | Role | Capabilities |
 |---|---|
-| **Customer** | Register/login, browse restaurants, search & filter food items (veg-only, price, sort), add to cart, place orders, mock online payment (card/UPI/wallet/COD), live order tracking, order history, ratings & reviews, saved address book, in-app notifications |
+| **Customer** | Register/login, browse restaurants, search & filter food items (veg-only, price, sort), add to cart, place orders, pay online via Razorpay (test mode) or Cash on Delivery, live order tracking, order history, ratings & reviews, saved address book, in-app notifications |
 | **Restaurant Owner** | Restaurant CRUD + logo/cover image upload, menu (category + item) CRUD + image upload, order management (confirm → prepare → ready for pickup, or cancel), dashboard with revenue/order/rating analytics |
 | **Delivery Partner** | Toggle availability & live location, browse and accept ready-for-pickup orders (claim-safe under concurrency), delivery lifecycle (picked up → out for delivery → delivered), delivery history |
 | **Admin** | Platform dashboard & analytics, user management (activate/deactivate any account), restaurant approval workflow, oversee/manage all orders, manage delivery partners |
 
 Cross-cutting: JWT access + rotating refresh tokens, role-based route protection on both ends,
 pagination/search/sort on every list endpoint, rate limiting (stricter on auth routes), Helmet /
-CORS / compression, a mock payment gateway with a simulated decline rate, an in-app notification
+CORS / compression, a real Razorpay integration running in test mode, an in-app notification
 system, a full order/delivery state machine, and a WCAG-conscious UI (focus traps, keyboard
 navigation, ARIA labeling, `prefers-reduced-motion` support). See
 [ARCHITECTURE.md §7](./ARCHITECTURE.md#7-order--delivery-state-machine) for the state machine and
@@ -113,6 +113,8 @@ Key variables:
 | `JWT_ACCESS_EXPIRES_IN` / `JWT_REFRESH_EXPIRES_IN` | backend | Token lifetimes (defaults: `15m` / `7d`) |
 | `CLIENT_URL` | backend | Origin allowed by CORS — must match where the frontend is served from |
 | `ADMIN_BOOTSTRAP_SECRET` | backend | Optional. Set it to enable `POST /auth/bootstrap-admin` for creating the first admin account over HTTP (see [Creating an admin account](#creating-an-admin-account)). Unset = endpoint disabled |
+| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | backend | Required — all image uploads (restaurant logo/cover, menu items, avatars) go straight to Cloudinary, no local-disk fallback |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | backend | Required — use **test mode** keys (`rzp_test_...`) from Razorpay Dashboard > Settings > API Keys. `KEY_ID` isn't a secret (the checkout widget ships it to the browser); `KEY_SECRET` never leaves the server |
 | `VITE_API_URL` | frontend | Base URL the browser calls for the API. **Baked in at build time** (Vite), not read at runtime — rebuild the frontend image if this changes |
 | `PORT` / `FRONTEND_PORT` | root (compose) | Host ports the API and frontend are published on |
 
@@ -220,8 +222,8 @@ Base path: `/api/v1`. Every list endpoint supports **pagination** (`page`, `limi
 | Categories | `GET /categories?restaurant=:id`; `POST/PATCH/DELETE /categories[/:id]` | public / owner, admin |
 | Menu Items | `GET /menu-items` (search, filters), `/:id`; `POST/PATCH/DELETE /menu-items[/:id]`; `PATCH /:id/image` | public / owner, admin |
 | Cart | `GET/DELETE /cart`; `POST/PATCH/DELETE /cart/items[/:itemId]` | customer |
-| Orders | `POST /orders` (checkout); `GET /orders`, `/:id` (role-scoped); `PATCH /:id/status` | customer / owner, admin |
-| Payments | `GET /payments/:id` | order owner, admin |
+| Orders | `POST /orders` (checkout — for `paymentMethod: "razorpay"`, response includes a Razorpay order to open Checkout with); `GET /orders`, `/:id` (role-scoped, `/:id` includes payment status); `PATCH /:id/status` | customer / owner, admin |
+| Payments | `GET /payments/:id`; `POST /payments/razorpay/verify` (confirms a completed Razorpay checkout) | order owner, admin |
 | Reviews | `GET /reviews?restaurant=:id`; `POST /reviews` (delivered orders only) | public / customer |
 | Delivery | `GET/PATCH /delivery/profile`, `/availability`, `/location`; `GET /delivery/orders/available`, `/assigned`, `/history`; `PATCH /delivery/orders/:id/accept`, `/picked-up`, `/out-for-delivery`, `/delivered` | deliveryPartner |
 | Admin | `GET /admin/dashboard`; `GET/PATCH /admin/users[/:id/status]`; `GET/PATCH /admin/restaurants[/:id/approve]`; `GET /admin/delivery-partners` | admin |
@@ -323,16 +325,17 @@ the backend needs the frontend's final URL for CORS:
 
 ```bash
 cd backend
-npm test               # full suite: 89 tests across 16 suites
+npm test               # full suite: 93 tests across 15 suites
 npm run test:coverage  # with a coverage report
 ```
 
-Unit tests cover pure logic in isolation (order pricing math, the order state machine, the mock
-payment gateway). Integration tests boot the real Express app against an in-memory MongoDB
-(`mongodb-memory-server` — no external database needed) and drive full multi-role HTTP flows:
-auth, users, restaurants (including the approval-gated search fix and ownership-checked image
-uploads), menu items, cart, the full order lifecycle across all four roles, payments, delivery
-(including concurrent-accept race-condition tests), notifications, and admin.
+Unit tests cover pure logic in isolation (order pricing math, the order state machine). Integration
+tests boot the real Express app against an in-memory MongoDB (`mongodb-memory-server` — no external
+database needed) and drive full multi-role HTTP flows: auth, users, restaurants (including the
+approval-gated search fix and ownership-checked image uploads), menu items, cart, the full order
+lifecycle across all four roles, payments (Razorpay order creation, signature verification —
+success, forged signature, and wrong-user cases — against a mocked Razorpay SDK, no real network
+calls), delivery (including concurrent-accept race-condition tests), notifications, and admin.
 
 ### Frontend — Vitest + React Testing Library
 
@@ -353,9 +356,12 @@ Beyond the automated suites, the assembled system was verified end-to-end agains
 containers (not the in-memory test database): both compose files build and start with all
 services reporting `healthy`; a scripted API smoke test drove the entire golden path — register
 all three self-registerable roles, seed an admin, create and approve a restaurant, build a menu,
-search for it publicly, add to cart, save an address, check out with the mock payment gateway,
-advance an order through every status as the owner and then the delivery partner, view order
-history, leave a review, and confirm the order shows up in the admin dashboard's analytics.
+search for it publicly, add to cart, save an address, check out (Cash on Delivery), advance an
+order through every status as the owner and then the delivery partner, view order history, leave
+a review, and confirm the order shows up in the admin dashboard's analytics. (Payments have since
+moved from a mock gateway to real Razorpay test-mode checkout — covered by the backend's mocked-SDK
+integration tests; the full golden path hasn't yet been re-run against live Docker containers with
+real Razorpay test-mode credentials.)
 
 There is currently no automated browser (Playwright/Cypress) suite — see
 [Future improvements](#future-improvements).
@@ -370,6 +376,9 @@ There is currently no automated browser (Playwright/Cypress) suite — see
 | `docker compose up` fails immediately on `backend` | Root `.env` is missing `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` — compose is configured to fail fast rather than silently run with an insecure default |
 | Can't log in as admin | No admin exists yet on a fresh database — call `POST /auth/bootstrap-admin` or run `npm run seed:admin` (see [above](#creating-an-admin-account)) |
 | `POST /auth/bootstrap-admin` always returns 403 | `ADMIN_BOOTSTRAP_SECRET` isn't set on the backend, or the `secret` field in your request doesn't match it exactly |
+| Checkout with "Pay online" does nothing / no popup appears | The Razorpay checkout script failed to load (ad blocker, offline) — check the browser console; `utils/razorpay.js` throws a clear error in this case |
+| `POST /orders` (Razorpay) returns 400 "Could not initiate payment" | `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are missing or wrong on the backend, or you're mixing live and test mode keys — check the backend logs for the underlying Razorpay API error |
+| `POST /payments/razorpay/verify` returns 400 | Signature mismatch — almost always means `RAZORPAY_KEY_SECRET` differs between when the order was created and when it's being verified (e.g. you changed it mid-checkout) |
 | Checkout randomly fails with "Payment failed" | Expected — the mock payment gateway simulates an ~8% decline rate for non-Cash-on-Delivery methods; just retry |
 | Image uploads 400 | Only JPEG/PNG/WEBP under 2MB are accepted (`middlewares/upload.middleware.js`) |
 | `docker compose logs backend` shows nothing | Fixed in this pass — older images only logged to a file in production; rebuild the backend image to pick up stdout logging |
@@ -378,13 +387,15 @@ There is currently no automated browser (Playwright/Cypress) suite — see
 
 Deliberate scope cuts and genuine next steps, not oversights:
 
-- **Real payment gateway** — checkout currently uses a simulated gateway (`utils/mockPaymentGateway.js`)
-  with an instant paid/declined result (or "pending" until delivery for Cash on Delivery). Swapping
-  in Stripe/Razorpay would mean adding a webhook endpoint and moving payment-status transitions
-  out of the request/response cycle.
-- **Object storage for uploads** — images are stored on local disk under `backend/uploads`
-  (persisted via a named Docker volume). Fine for a single instance; a multi-instance or
-  ephemeral-filesystem deployment should move this to S3/GCS/Cloudinary.
+- **Razorpay webhooks** — payment confirmation currently relies entirely on the client calling
+  `POST /payments/razorpay/verify` after Checkout succeeds. If a customer closes the tab/app after
+  paying but before that call fires, the payment stays `pending` on our side even though Razorpay
+  actually captured it. A webhook endpoint (`payment.captured`, verified via Razorpay's webhook
+  signature) would confirm payments server-side regardless of what the client does, and is required
+  before switching from test mode to live keys.
+- **Live mode** — everything is wired for Razorpay's **test mode** keys (`rzp_test_...`) as
+  requested; going live means switching to `rzp_live_...` keys, completing Razorpay's KYC/activation
+  flow, and adding the webhook above.
 - **Distance-based delivery pricing & a coupon engine** — `deliveryFee` is currently a flat
   constant, and `pricing.discount` exists on the Order model but nothing populates it yet.
 - **Push/email/SMS notifications** — notifications are in-app only today (stored in the

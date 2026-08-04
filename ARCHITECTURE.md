@@ -2,10 +2,11 @@
 
 Status: **Full stack, fully integrated, production-reviewed.** Every module below is implemented
 end-to-end across all four roles (Customer, Restaurant Owner, Delivery Partner, Admin) — backend
-services, controllers, validators, RBAC, pagination/search/sort, Swagger docs, an 89-test Jest +
+services, controllers, validators, RBAC, pagination/search/sort, Swagger docs, a 93-test Jest +
 Supertest integration suite, and a React 19 + Vite frontend (47 Vitest + React Testing Library
-tests) wired to every endpoint, plus notifications, a mock payment gateway, and full Docker
-Compose orchestration verified with real container builds and health checks. See the root
+tests) wired to every endpoint, plus notifications, real Razorpay checkout (test mode), Cloudinary
+image uploads, and full Docker Compose orchestration verified with real container builds and
+health checks. See the root
 [README.md](./README.md) for installation, environment setup, and deployment instructions.
 
 ---
@@ -21,11 +22,14 @@ foof_p/
 │   │   │   ├── env.js                # validated env vars (single source of truth)
 │   │   │   ├── db.js                 # Mongoose connection + graceful shutdown
 │   │   │   ├── logger.js             # Winston logger (+ Morgan stream)
+│   │   │   ├── cloudinary.js         # Cloudinary SDK config (image uploads)
+│   │   │   ├── razorpay.js           # Razorpay SDK config (test-mode keys)
 │   │   │   └── swagger.js            # swagger-jsdoc spec + swagger-ui mount
 │   │   ├── constants/
 │   │   │   ├── roles.js              # ROLES enum (customer, restaurantOwner, deliveryPartner, admin)
-│   │   │   ├── orderStatus.js        # ORDER_STATUS / PAYMENT_STATUS enums
+│   │   │   ├── orderStatus.js        # ORDER_STATUS / PAYMENT_STATUS / PAYMENT_METHOD enums
 │   │   │   ├── pricing.js            # tax rate / delivery fee constants
+│   │   │   ├── uploadFolders.js      # Cloudinary folder names per upload type
 │   │   │   └── notification.js       # NOTIFICATION_TYPE enum
 │   │   ├── models/
 │   │   │   ├── shared/
@@ -44,7 +48,7 @@ foof_p/
 │   │   │   ├── auth.middleware.js       # JWT verification, req.user
 │   │   │   ├── role.middleware.js       # RBAC guard: authorize(...roles)
 │   │   │   ├── ownership.middleware.js  # pre-upload ownership checks (before multer touches disk)
-│   │   │   ├── upload.middleware.js     # multer disk storage, mimetype/size limits
+│   │   │   ├── upload.middleware.js     # multer memoryStorage, mimetype/size limits (no local disk)
 │   │   │   ├── validate.middleware.js   # Zod schema validation (body/query/params)
 │   │   │   ├── rateLimiter.middleware.js
 │   │   │   ├── notFound.middleware.js
@@ -57,7 +61,7 @@ foof_p/
 │   │   │   ├── tokens.js              # sign/verify access + refresh tokens (HS256, pinned algorithm)
 │   │   │   ├── orderStateMachine.js   # assertTransition — status graph per role
 │   │   │   ├── orderPricing.js        # pure subtotal/tax/fee/total calculation
-│   │   │   └── mockPaymentGateway.js  # simulated charge: instant paid/failed, COD pending
+│   │   │   └── cloudinaryUpload.js    # stream a multer buffer to Cloudinary; delete on replace
 │   │   ├── validations/
 │   │   │   ├── common.validation.js
 │   │   │   ├── auth.validation.js
@@ -65,6 +69,7 @@ foof_p/
 │   │   │   ├── restaurant.validation.js
 │   │   │   ├── category.validation.js
 │   │   │   ├── menuItem.validation.js
+│   │   │   ├── payment.validation.js  # POST /payments/razorpay/verify body shape
 │   │   │   ├── cart.validation.js
 │   │   │   ├── order.validation.js
 │   │   │   ├── review.validation.js
@@ -122,9 +127,8 @@ foof_p/
 │   │   ├── unit/
 │   │   │   ├── utils.test.js
 │   │   │   ├── orderPricing.test.js
-│   │   │   ├── mockPaymentGateway.test.js
 │   │   │   └── orderStateMachine.test.js
-│   │   ├── integration/                 # one file per resource — 89 tests total
+│   │   ├── integration/                 # one file per resource — 93 tests total
 │   │   │   ├── health.test.js
 │   │   │   ├── auth.test.js
 │   │   │   ├── user.test.js
@@ -132,7 +136,7 @@ foof_p/
 │   │   │   ├── menu.test.js
 │   │   │   ├── cart.test.js
 │   │   │   ├── orderLifecycle.test.js   # cart -> checkout -> owner updates -> delivery -> review, across roles
-│   │   │   ├── payment.test.js
+│   │   │   ├── payment.test.js          # Razorpay order creation + signature verification (SDK mocked)
 │   │   │   ├── delivery.test.js         # includes concurrent-accept race-condition tests
 │   │   │   ├── notification.test.js
 │   │   │   ├── bootstrapAdmin.test.js   # secret-gated admin creation/promotion over HTTP
@@ -167,7 +171,7 @@ foof_p/
     │   │   └── admin/                 # Dashboard, Users, Restaurants, Orders, DeliveryPartners, Analytics
     │   ├── routes/                    # ProtectedRoute / RoleRoute guards
     │   ├── test/setup.js              # Vitest + jest-dom setup
-    │   └── utils/                     # format.js, constants.js
+    │   └── utils/                     # format.js, constants.js, razorpay.js (checkout widget loader)
     ├── Dockerfile                     # multi-stage: vite build -> nginx-unprivileged
     ├── nginx.conf                     # SPA fallback (try_files -> index.html) + security headers
     ├── vercel.json                    # same SPA fallback + headers, for the Vercel deploy target
@@ -389,10 +393,11 @@ All endpoints below are fully implemented.
 | Menu Items | PATCH | `/menu-items/:id/image` (multer) | owner, admin |
 | Cart | GET/DELETE | `/cart` | customer |
 | Cart | POST/PATCH/DELETE | `/cart/items[/:itemId]` | customer |
-| Orders | POST | `/orders` (checkout: cart → order + payment) | customer |
-| Orders | GET | `/orders`, `/orders/:id` (role-scoped: own / own-restaurant / assigned / all) | customer, owner, deliveryPartner, admin |
+| Orders | POST | `/orders` (checkout: cart → order + payment; for `paymentMethod: "razorpay"` also creates a Razorpay order and returns it + the public key id) | customer |
+| Orders | GET | `/orders`, `/orders/:id` (role-scoped: own / own-restaurant / assigned / all; `/:id` includes the linked payment) | customer, owner, deliveryPartner, admin |
 | Orders | PATCH | `/orders/:id/status` (confirm/prepare/ready/cancel) | restaurantOwner, admin |
 | Payments | GET | `/payments/:id` | order owner, admin |
+| Payments | POST | `/payments/razorpay/verify` (HMAC-verifies a completed Razorpay checkout, marks the payment paid) | authenticated (payment owner only) |
 | Reviews | GET | `/reviews?restaurant=:id` | public |
 | Reviews | POST | `/reviews` (delivered orders only, one per order) | customer |
 | Delivery | GET/PATCH | `/delivery/profile`, `/delivery/availability`, `/delivery/location` | deliveryPartner |
@@ -499,10 +504,14 @@ deliveryFee − discount. Orders below the restaurant's `minOrderAmount` are rej
 
 ## 8. What's intentionally deferred
 
-Deliberately out of scope, as simplifications rather than oversights: a *real* payment gateway
-integration (payments are simulated by `utils/mockPaymentGateway.js` — instant "paid" or a
-simulated decline for card/UPI/wallet, "pending" until delivery for COD), distance-based delivery
-pricing, a coupon/discount engine (the `pricing.discount` field exists on the Order model for
-forward-compatibility but nothing currently populates it), and push/email/SMS delivery for
-notifications (they're in-app only, stored in the `notifications` collection and polled by the
-frontend — no external notification service is wired up).
+Deliberately out of scope, as simplifications rather than oversights: a **Razorpay webhook**
+(`payment.captured`) for server-side payment confirmation independent of the client — right now,
+confirmation relies on the browser calling `POST /payments/razorpay/verify` after Checkout
+succeeds, so a payment that Razorpay captures but whose confirmation call never reaches us (tab
+closed mid-flow, network drop) stays `pending` on our side even though the customer was charged; a
+webhook closes that gap and is required before switching from Razorpay's test-mode keys to live
+ones. Also deferred: distance-based delivery pricing, a coupon/discount engine (the
+`pricing.discount` field exists on the Order model for forward-compatibility but nothing currently
+populates it), and push/email/SMS delivery for notifications (they're in-app only, stored in the
+`notifications` collection and polled by the frontend — no external notification service is wired
+up).

@@ -33,6 +33,12 @@ const envSchema = z
     CLOUDINARY_API_KEY: z.string().min(1, 'CLOUDINARY_API_KEY is required'),
     CLOUDINARY_API_SECRET: z.string().min(1, 'CLOUDINARY_API_SECRET is required'),
 
+    // Razorpay test-mode keys (rzp_test_...) from the Dashboard's Settings > API Keys. The key id
+    // is not a secret (the checkout widget ships it to the browser); the key secret signs/verifies
+    // payments server-side and must never reach the client.
+    RAZORPAY_KEY_ID: z.string().min(1, 'RAZORPAY_KEY_ID is required'),
+    RAZORPAY_KEY_SECRET: z.string().min(1, 'RAZORPAY_KEY_SECRET is required'),
+
     BCRYPT_SALT_ROUNDS: z.coerce.number().default(10),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
     RATE_LIMIT_MAX: z.coerce.number().default(200),

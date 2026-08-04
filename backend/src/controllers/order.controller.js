@@ -13,8 +13,8 @@ const orderService = require('../services/order.service');
  *     tags: [Orders]
  */
 const placeOrder = asyncHandler(async (req, res) => {
-  const { order, payment } = await orderService.placeOrder(req.user, req.body);
-  new ApiResponse(201, { order, payment }, 'Order placed successfully').send(res);
+  const { order, payment, razorpayOrder, razorpayKeyId } = await orderService.placeOrder(req.user, req.body);
+  new ApiResponse(201, { order, payment, razorpayOrder, razorpayKeyId }, 'Order placed successfully').send(res);
 });
 
 const listOrders = asyncHandler(async (req, res) => {

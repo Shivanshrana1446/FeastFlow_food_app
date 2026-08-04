@@ -14,4 +14,16 @@ const getPayment = asyncHandler(async (req, res) => {
   new ApiResponse(200, payment, 'Payment fetched').send(res);
 });
 
-module.exports = { getPayment };
+/**
+ * @openapi
+ * /payments/razorpay/verify:
+ *   post:
+ *     summary: Verify a completed Razorpay checkout and mark the payment paid
+ *     tags: [Payments]
+ */
+const verifyRazorpayPayment = asyncHandler(async (req, res) => {
+  const payment = await paymentService.verifyRazorpayPayment(req.user, req.body);
+  new ApiResponse(200, payment, 'Payment verified').send(res);
+});
+
+module.exports = { getPayment, verifyRazorpayPayment };

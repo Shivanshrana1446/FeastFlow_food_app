@@ -8,8 +8,9 @@ const paymentSchema = new mongoose.Schema(
     amount: { type: Number, required: true, min: 0 },
     method: { type: String, enum: PAYMENT_METHOD_VALUES, required: true },
     status: { type: String, enum: PAYMENT_STATUS_VALUES, default: PAYMENT_STATUS.PENDING, index: true },
-    gateway: { type: String, default: 'manual' }, // e.g. "razorpay", "stripe"
-    transactionId: { type: String },
+    gateway: { type: String, default: 'manual' }, // e.g. "razorpay", "cash"
+    gatewayOrderId: { type: String, index: true }, // Razorpay order id, created upfront at checkout
+    transactionId: { type: String }, // Razorpay payment id, set once the signature is verified
     failureReason: { type: String },
     refundedAmount: { type: Number, default: 0, min: 0 },
   },

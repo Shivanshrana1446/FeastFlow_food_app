@@ -1,8 +1,16 @@
+const crypto = require('crypto');
 const request = require('supertest');
 const app = require('../../src/app');
 const { registerUser, createAdmin, authHeader } = require('../helpers/auth');
 const { createApprovedRestaurant, createMenuItem } = require('../helpers/fixtures');
 const { ROLES } = require('../../src/constants/roles');
+
+function razorpaySignatureFor(orderId, paymentId) {
+  return crypto
+    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+    .update(`${orderId}|${paymentId}`)
+    .digest('hex');
+}
 
 async function placeOrder(customerToken, menuItemId, paymentMethod = 'cashOnDelivery') {
   await request(app)
@@ -56,50 +64,92 @@ describe('Payment module', () => {
     expect(res.status).toBe(404);
   });
 
-  it('settles a card payment as paid immediately when the mock gateway approves it', async () => {
+  it('creates a Razorpay order at checkout and leaves the payment pending until verified', async () => {
     const { accessToken: ownerToken } = await registerUser(ROLES.RESTAURANT_OWNER);
     const { accessToken: adminToken } = await createAdmin();
     const restaurantId = await createApprovedRestaurant(ownerToken, adminToken);
     const { menuItemId } = await createMenuItem(ownerToken, restaurantId, { price: 20 });
     const { accessToken: customerToken } = await registerUser(ROLES.CUSTOMER);
 
-    const originalRandom = Math.random;
-    Math.random = () => 0.99; // comfortably above the decline threshold
-    let orderRes;
-    try {
-      orderRes = await placeOrder(customerToken, menuItemId, 'card');
-    } finally {
-      Math.random = originalRandom;
-    }
+    const orderRes = await placeOrder(customerToken, menuItemId, 'razorpay');
 
     expect(orderRes.status).toBe(201);
-    expect(orderRes.body.data.payment.status).toBe('paid');
-    expect(orderRes.body.data.payment.transactionId).toEqual(expect.stringContaining('SIM-'));
+    expect(orderRes.body.data.payment.status).toBe('pending');
+    expect(orderRes.body.data.payment.gatewayOrderId).toEqual(expect.stringContaining('order_test_fake_'));
+    expect(orderRes.body.data.razorpayOrder.id).toBe(orderRes.body.data.payment.gatewayOrderId);
+    expect(orderRes.body.data.razorpayKeyId).toBe(process.env.RAZORPAY_KEY_ID);
   });
 
-  it('blocks checkout when the mock gateway declines the charge, leaving the cart intact', async () => {
+  it('marks the payment paid once the Razorpay signature verifies', async () => {
     const { accessToken: ownerToken } = await registerUser(ROLES.RESTAURANT_OWNER);
     const { accessToken: adminToken } = await createAdmin();
     const restaurantId = await createApprovedRestaurant(ownerToken, adminToken);
     const { menuItemId } = await createMenuItem(ownerToken, restaurantId, { price: 20 });
     const { accessToken: customerToken } = await registerUser(ROLES.CUSTOMER);
 
-    const originalRandom = Math.random;
-    Math.random = () => 0; // guaranteed decline
-    let orderRes;
-    try {
-      orderRes = await placeOrder(customerToken, menuItemId, 'upi');
-    } finally {
-      Math.random = originalRandom;
-    }
+    const orderRes = await placeOrder(customerToken, menuItemId, 'razorpay');
+    const razorpayOrderId = orderRes.body.data.razorpayOrder.id;
+    const razorpayPaymentId = 'pay_test_fake_1';
 
-    expect(orderRes.status).toBe(400);
-    expect(orderRes.body.message).toEqual(expect.stringContaining('Payment failed'));
+    const verifyRes = await request(app)
+      .post('/api/v1/payments/razorpay/verify')
+      .set('Authorization', authHeader(customerToken))
+      .send({
+        razorpayOrderId,
+        razorpayPaymentId,
+        razorpaySignature: razorpaySignatureFor(razorpayOrderId, razorpayPaymentId),
+      });
 
-    const cartRes = await request(app).get('/api/v1/cart').set('Authorization', authHeader(customerToken));
-    expect(cartRes.body.data.items).toHaveLength(1);
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.data.status).toBe('paid');
+    expect(verifyRes.body.data.transactionId).toBe(razorpayPaymentId);
+  });
 
-    const ordersRes = await request(app).get('/api/v1/orders').set('Authorization', authHeader(customerToken));
-    expect(ordersRes.body.data).toHaveLength(0);
+  it('rejects verification with a forged signature and leaves the payment pending', async () => {
+    const { accessToken: ownerToken } = await registerUser(ROLES.RESTAURANT_OWNER);
+    const { accessToken: adminToken } = await createAdmin();
+    const restaurantId = await createApprovedRestaurant(ownerToken, adminToken);
+    const { menuItemId } = await createMenuItem(ownerToken, restaurantId, { price: 20 });
+    const { accessToken: customerToken } = await registerUser(ROLES.CUSTOMER);
+
+    const orderRes = await placeOrder(customerToken, menuItemId, 'razorpay');
+    const razorpayOrderId = orderRes.body.data.razorpayOrder.id;
+
+    const verifyRes = await request(app)
+      .post('/api/v1/payments/razorpay/verify')
+      .set('Authorization', authHeader(customerToken))
+      .send({ razorpayOrderId, razorpayPaymentId: 'pay_test_fake_2', razorpaySignature: 'not-the-real-signature' });
+
+    expect(verifyRes.status).toBe(400);
+
+    const paymentId = orderRes.body.data.payment._id;
+    const paymentRes = await request(app)
+      .get(`/api/v1/payments/${paymentId}`)
+      .set('Authorization', authHeader(customerToken));
+    expect(paymentRes.body.data.status).toBe('pending');
+  });
+
+  it("rejects verifying someone else's payment", async () => {
+    const { accessToken: ownerToken } = await registerUser(ROLES.RESTAURANT_OWNER);
+    const { accessToken: adminToken } = await createAdmin();
+    const restaurantId = await createApprovedRestaurant(ownerToken, adminToken);
+    const { menuItemId } = await createMenuItem(ownerToken, restaurantId, { price: 20 });
+    const { accessToken: customerToken } = await registerUser(ROLES.CUSTOMER);
+    const { accessToken: otherCustomerToken } = await registerUser(ROLES.CUSTOMER);
+
+    const orderRes = await placeOrder(customerToken, menuItemId, 'razorpay');
+    const razorpayOrderId = orderRes.body.data.razorpayOrder.id;
+    const razorpayPaymentId = 'pay_test_fake_3';
+
+    const verifyRes = await request(app)
+      .post('/api/v1/payments/razorpay/verify')
+      .set('Authorization', authHeader(otherCustomerToken))
+      .send({
+        razorpayOrderId,
+        razorpayPaymentId,
+        razorpaySignature: razorpaySignatureFor(razorpayOrderId, razorpayPaymentId),
+      });
+
+    expect(verifyRes.status).toBe(403);
   });
 });

@@ -6,4 +6,5 @@ export const orderApi = {
   getById: (id) => unwrap(axiosClient.get(`/orders/${id}`)),
   updateStatus: (id, payload) => unwrap(axiosClient.patch(`/orders/${id}/status`, payload)),
   getPayment: (id) => unwrap(axiosClient.get(`/payments/${id}`)),
+  verifyRazorpayPayment: (payload) => unwrap(axiosClient.post('/payments/razorpay/verify', payload)),
 };

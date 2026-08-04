@@ -1510,7 +1510,7 @@
                 "orders"
               ]
             },
-            "description": "Requires a non-empty cart and an approved, open restaurant. Simulates a payment gateway charge — non-COD methods have a small chance of a realistic decline.",
+            "description": "Requires a non-empty cart and an approved, open restaurant. paymentMethod is either \"cashOnDelivery\" (settles on delivery) or \"razorpay\" (response includes razorpayOrder + razorpayKeyId — open Razorpay Checkout with those, then call Verify Razorpay Payment below with the result).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1523,7 +1523,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"deliveryAddress\": {\n    \"line1\": \"5 Home Ave\",\n    \"city\": \"Springfield\",\n    \"state\": \"IL\",\n    \"postalCode\": \"62702\",\n    \"country\": \"USA\"\n  },\n  \"paymentMethod\": \"cashOnDelivery\"\n}",
+              "raw": "{\n  \"deliveryAddress\": {\n    \"line1\": \"5 Home Ave\",\n    \"city\": \"Springfield\",\n    \"state\": \"IL\",\n    \"postalCode\": \"62702\",\n    \"country\": \"USA\"\n  },\n  \"paymentMethod\": \"razorpay\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1543,6 +1543,7 @@
                   "  const data = pm.response.json().data;",
                   "  pm.environment.set('orderId', data.order._id);",
                   "  pm.environment.set('paymentId', data.payment._id);",
+                  "  if (data.razorpayOrder) pm.environment.set('razorpayOrderId', data.razorpayOrder.id);",
                   "}"
                 ]
               }
@@ -1769,6 +1770,50 @@
                   "type": "string"
                 }
               ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Razorpay Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/razorpay/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "razorpay",
+                "verify"
+              ]
+            },
+            "description": "Call this after Razorpay Checkout (in test mode) reports success on the frontend, using the razorpay_order_id / razorpay_payment_id / razorpay_signature it returns. There is no way to produce a real signature from Postman alone — this exists mainly as an API reference; drive the actual test-mode payment through the frontend checkout flow.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpayOrderId\": \"{{razorpayOrderId}}\",\n  \"razorpayPaymentId\": \"\",\n  \"razorpaySignature\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []

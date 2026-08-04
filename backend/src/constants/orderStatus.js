@@ -31,11 +31,12 @@ const PAYMENT_STATUS = Object.freeze({
   REFUNDED: 'refunded',
 });
 
+// Card/UPI/wallet/netbanking are no longer distinct methods on our side — Razorpay's own
+// checkout widget lets the customer pick among those itself, so we only need to know whether
+// this order pays online (through Razorpay) or on delivery (cash, settled later).
 const PAYMENT_METHOD = Object.freeze({
-  CARD: 'card',
-  UPI: 'upi',
+  RAZORPAY: 'razorpay',
   CASH_ON_DELIVERY: 'cashOnDelivery',
-  WALLET: 'wallet',
 });
 
 module.exports = {

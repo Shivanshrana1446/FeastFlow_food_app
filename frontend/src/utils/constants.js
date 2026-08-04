@@ -58,18 +58,16 @@ export const ORDER_STATUS_FLOW = [
   ORDER_STATUS.DELIVERED,
 ];
 
+// Card/UPI/wallet/netbanking are chosen inside Razorpay's own checkout widget, not on our site —
+// we only need to know whether an order pays online (through Razorpay) or on delivery (cash).
 export const PAYMENT_METHOD = {
-  CARD: 'card',
-  UPI: 'upi',
+  RAZORPAY: 'razorpay',
   CASH_ON_DELIVERY: 'cashOnDelivery',
-  WALLET: 'wallet',
 };
 
 export const PAYMENT_METHOD_LABEL = {
-  card: 'Credit / Debit Card',
-  upi: 'UPI',
+  razorpay: 'Pay online (Card / UPI / Wallet)',
   cashOnDelivery: 'Cash on Delivery',
-  wallet: 'Wallet',
 };
 
 export const ROLE_HOME_PATH = {

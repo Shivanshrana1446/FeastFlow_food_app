@@ -3,10 +3,12 @@ const Cart = require('../models/cart.model');
 const Restaurant = require('../models/restaurant.model');
 const ApiError = require('../utils/ApiError');
 const paginate = require('../utils/paginate');
+const env = require('../config/env');
+const logger = require('../config/logger');
+const razorpay = require('../config/razorpay');
 const { calculateOrderPricing } = require('../utils/orderPricing');
 const { assertTransition } = require('../utils/orderStateMachine');
-const { chargeMock } = require('../utils/mockPaymentGateway');
-const { ORDER_STATUS, ORDER_STATUS_LABEL } = require('../constants/orderStatus');
+const { ORDER_STATUS, ORDER_STATUS_LABEL, PAYMENT_METHOD } = require('../constants/orderStatus');
 const { DEFAULT_DELIVERY_FEE } = require('../constants/pricing');
 const { ROLES } = require('../constants/roles');
 const { NOTIFICATION_TYPE } = require('../constants/notification');
@@ -36,10 +38,21 @@ async function placeOrder(user, payload) {
     throw ApiError.badRequest(`Minimum order amount for this restaurant is ${restaurant.minOrderAmount}`);
   }
 
-  // Charge before creating the order so a declined payment never leaves a phantom order behind.
-  const chargeResult = chargeMock(payload.paymentMethod);
-  if (!chargeResult.success) {
-    throw ApiError.badRequest(`Payment failed: ${chargeResult.failureReason}. Please try again.`);
+  // For Razorpay, create the gateway order BEFORE our own Order document — if Razorpay's API
+  // fails, nothing gets persisted on our side and the customer just retries. Doing it the other
+  // way around would risk a phantom Order with no way to ever pay for it.
+  let razorpayOrder = null;
+  if (payload.paymentMethod === PAYMENT_METHOD.RAZORPAY) {
+    try {
+      razorpayOrder = await razorpay.orders.create({
+        amount: Math.round(pricing.total * 100), // Razorpay wants the smallest currency unit (paise)
+        currency: 'INR',
+        receipt: `rcpt_${Date.now()}`,
+      });
+    } catch (error) {
+      logger.error(`Razorpay order creation failed: ${error.message}`);
+      throw ApiError.badRequest('Could not initiate payment. Please try again.');
+    }
   }
 
   const order = await Order.create({
@@ -58,7 +71,9 @@ async function placeOrder(user, payload) {
     estimatedDeliveryAt: new Date(Date.now() + (restaurant.avgPreparationTimeMinutes + 30) * 60 * 1000),
   });
 
-  const payment = await paymentService.createPaymentRecord(order, chargeResult, payload.paymentMethod);
+  const payment = razorpayOrder
+    ? await paymentService.createRazorpayPaymentRecord(order, payload.paymentMethod, razorpayOrder.id)
+    : await paymentService.createCodPaymentRecord(order, payload.paymentMethod);
   await cart.deleteOne();
 
   await notificationService.notify(
@@ -69,7 +84,14 @@ async function placeOrder(user, payload) {
     { orderId: order._id }
   );
 
-  return { order, payment };
+  return {
+    order,
+    payment,
+    ...(razorpayOrder && {
+      razorpayOrder: { id: razorpayOrder.id, amount: razorpayOrder.amount, currency: razorpayOrder.currency },
+      razorpayKeyId: env.RAZORPAY_KEY_ID,
+    }),
+  };
 }
 
 async function listOrders(requester, query) {
@@ -107,7 +129,17 @@ async function getOrderById(requester, id) {
   if (!order) throw ApiError.notFound('Order not found');
   await assertOrderAccess(requester, order); // must run before populate: relies on raw ObjectId refs
   await order.populate(ORDER_POPULATE);
-  return order;
+
+  // Lets the receipt page (and a Razorpay payment retry) load from just an order id — e.g. after
+  // a page refresh, when no payment id is available from in-memory navigation state. key_id is
+  // not a secret (the checkout widget ships it to the browser either way), so it's fine to
+  // include whenever there's an unpaid Razorpay payment to retry.
+  const payment = await paymentService.getPaymentByOrderId(order._id);
+  return {
+    ...order.toObject(),
+    payment,
+    ...(payment?.gateway === 'razorpay' && { razorpayKeyId: env.RAZORPAY_KEY_ID }),
+  };
 }
 
 /** Restaurant-owner/admin lifecycle transitions: confirm, prepare, ready, cancel. */

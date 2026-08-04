@@ -13,6 +13,7 @@ import PageTransition from '@/components/common/PageTransition';
 import AddressForm from '@/components/common/AddressForm';
 import { formatCurrency } from '@/utils/format';
 import { PAYMENT_METHOD, PAYMENT_METHOD_LABEL } from '@/utils/constants';
+import { openRazorpayCheckout } from '@/utils/razorpay';
 
 function AddAddressForm({ onSaved }) {
   const dispatch = useAppDispatch();
@@ -71,7 +72,7 @@ export default function Checkout() {
 
     setPlacing(true);
     try {
-      const { order, payment } = await orderApi.placeOrder({
+      const { order, payment, razorpayOrder, razorpayKeyId } = await orderApi.placeOrder({
         deliveryAddress: {
           line1: address.line1,
           line2: address.line2,
@@ -83,7 +84,34 @@ export default function Checkout() {
         paymentMethod,
       });
       dispatch(resetCart());
-      navigate(`/payment/${order._id}`, { state: { order, payment } });
+
+      // The order already exists at this point regardless of what happens with Razorpay next —
+      // reopening the checkout modal (or trying again later) is handled by the receipt page, not
+      // by staying here, since re-submitting this form would create a second, duplicate order.
+      if (paymentMethod !== PAYMENT_METHOD.RAZORPAY) {
+        navigate(`/payment/${order._id}`, { state: { order, payment } });
+        return;
+      }
+
+      try {
+        const result = await openRazorpayCheckout({
+          razorpayOrder,
+          keyId: razorpayKeyId,
+          user,
+          description: `Order from ${cart.restaurant?.name || 'FeastFlow'}`,
+        });
+        const verifiedPayment = await orderApi.verifyRazorpayPayment({
+          razorpayOrderId: result.razorpay_order_id,
+          razorpayPaymentId: result.razorpay_payment_id,
+          razorpaySignature: result.razorpay_signature,
+        });
+        navigate(`/payment/${order._id}`, { state: { order, payment: verifiedPayment } });
+      } catch {
+        // Dismissed the modal or the payment failed — the order is still there, unpaid; let the
+        // receipt page offer a retry instead of losing the order entirely.
+        notify('Payment was not completed. You can finish paying from your order page.', 'info');
+        navigate(`/payment/${order._id}`, { state: { order, payment } });
+      }
     } catch (err) {
       notify(errorMessage(err, 'Could not place order'), 'error');
     } finally {
@@ -186,7 +214,7 @@ export default function Checkout() {
       </section>
 
       <Button className="mt-6 w-full" onClick={handlePlaceOrder} loading={placing} disabled={!selectedAddressId}>
-        Place order
+        {paymentMethod === PAYMENT_METHOD.RAZORPAY ? 'Proceed to pay' : 'Place order'}
       </Button>
 
       {!user?.addresses?.length && !showAddForm && (

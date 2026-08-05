@@ -9,8 +9,8 @@ const options = {
       version: '1.0.0',
       description:
         'REST API for a multi-role food ordering platform (Customer, Restaurant Owner, ' +
-        'Delivery Partner, Admin). Business logic beyond authentication is scaffolded ' +
-        'and will be implemented in the next phase.',
+        'Delivery Partner, Admin). See /docs in this repo for the database schema, ER ' +
+        'diagram, and a Postman collection.',
     },
     servers: [{ url: `/api/${env.API_VERSION}`, description: 'Current API version' }],
     components: {

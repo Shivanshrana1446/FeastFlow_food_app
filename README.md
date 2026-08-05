@@ -54,12 +54,17 @@ foof_p/
 ├── README.md                # You are here
 ├── docker-compose.yml       # Orchestrates mongo + backend + frontend
 ├── .env.example             # Root-level compose variables
-├── postman/                 # Postman collection + environment
+├── docs/                    # Database schema, ER diagram, API docs, Postman — see docs/README.md
+│   ├── DATABASE_SCHEMA.md
+│   ├── ER_DIAGRAM.md
+│   ├── API_DOCUMENTATION.md
+│   ├── openapi.json
+│   └── postman/
 ├── backend/                 # Express REST API
 │   ├── src/                 # config, constants, models, middlewares, validations, services,
 │   │                        # controllers, routes — see ARCHITECTURE.md §1 for the full tree
 │   ├── scripts/seedAdmin.js # Bootstraps the first admin account (see below)
-│   ├── tests/               # Jest + Supertest — 89 tests, unit + integration
+│   ├── tests/               # Jest + Supertest — 93 tests, unit + integration
 │   ├── Dockerfile
 │   └── docker-compose.yml   # Backend + Mongo only (no frontend) — for API-only development
 └── frontend/                 # React 19 + Vite SPA
@@ -261,16 +266,19 @@ Base path: `/api/v1`. Every list endpoint supports **pagination** (`page`, `limi
 | Notifications | `GET /notifications`; `PATCH /:id/read`, `/read-all` | authenticated |
 | Docs / Health | `GET /docs` (Swagger UI), `GET /health` | public |
 
-- **Full endpoint reference & request/response shapes**: [ARCHITECTURE.md §4](./ARCHITECTURE.md#4-api-structure).
+Standalone reference docs live in **[docs/](./docs/)**:
+
+- **[docs/API_DOCUMENTATION.md](./docs/API_DOCUMENTATION.md)** — every endpoint, flat reference table
+- **[docs/openapi.json](./docs/openapi.json)** — generated OpenAPI 3.0 spec (same one behind the live Swagger UI)
 - **Live, testable docs**: `http://localhost:5000/docs` once the backend is running — authorize
   with a Bearer token from `POST /auth/login`.
-- **Postman**: import [`postman/FeastFlow.postman_collection.json`](./postman/FeastFlow.postman_collection.json)
-  and [`postman/FeastFlow.postman_environment.json`](./postman/FeastFlow.postman_environment.json).
-  Organized to run top-to-bottom (Auth → Restaurants → Categories → Menu Items → Cart → Orders →
-  Delivery → Reviews → Notifications → Admin); requests that create a resource save its id into an
-  environment variable automatically.
-- **Database schema & ER diagram**: [ARCHITECTURE.md §2](./ARCHITECTURE.md#2-database-design-mongodb-normalized-where-relationships-are-queried-independently).
-  Mongoose schemas themselves are the source of truth: `backend/src/models/*.model.js`.
+- **[docs/postman/](./docs/postman/)** — import `FeastFlow.postman_collection.json` and
+  `FeastFlow.postman_environment.json`. Organized to run top-to-bottom (Auth → Restaurants →
+  Categories → Menu Items → Cart → Orders → Delivery → Reviews → Notifications → Admin); requests
+  that create a resource save its id into an environment variable automatically.
+- **[docs/DATABASE_SCHEMA.md](./docs/DATABASE_SCHEMA.md)** and **[docs/ER_DIAGRAM.md](./docs/ER_DIAGRAM.md)**
+  — collection-by-collection schema and the entity-relationship diagram. Mongoose schemas
+  themselves remain the source of truth: `backend/src/models/*.model.js`.
 
 ## Deployment guide
 

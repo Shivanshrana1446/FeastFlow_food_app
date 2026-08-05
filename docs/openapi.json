@@ -1,0 +1,542 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Online Food Ordering & Restaurant Management System API",
+    "version": "1.0.0",
+    "description": "REST API for a multi-role food ordering platform (Customer, Restaurant Owner, Delivery Partner, Admin). See /docs in this repo for the database schema, ER diagram, and a Postman collection."
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Current API version"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/users/{id}": {
+      "get": {
+        "summary": "Get a user profile (self or admin)",
+        "tags": [
+          "Users"
+        ]
+      },
+      "patch": {
+        "summary": "Update a user profile (self or admin)",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/me/addresses": {
+      "post": {
+        "summary": "Add an address to the current user's address book",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/me/addresses/{addressId}": {
+      "patch": {
+        "summary": "Update an address in the current user's address book",
+        "tags": [
+          "Users"
+        ]
+      },
+      "delete": {
+        "summary": "Remove an address from the current user's address book",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/me/avatar": {
+      "patch": {
+        "summary": "Upload/replace the current user's profile picture",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/reviews": {
+      "get": {
+        "summary": "List reviews for a restaurant",
+        "tags": [
+          "Reviews"
+        ]
+      },
+      "post": {
+        "summary": "Review a delivered order (customer)",
+        "tags": [
+          "Reviews"
+        ]
+      }
+    },
+    "/restaurants": {
+      "get": {
+        "summary": "Search restaurants (text search, cuisine/city/isOpen filters, sorting, pagination, geo-radius)",
+        "tags": [
+          "Restaurants"
+        ]
+      },
+      "post": {
+        "summary": "Create a restaurant (restaurantOwner/admin)",
+        "tags": [
+          "Restaurants"
+        ]
+      }
+    },
+    "/restaurants/mine": {
+      "get": {
+        "summary": "List restaurants owned by the current user, including unapproved ones (dashboard use)",
+        "tags": [
+          "Restaurants"
+        ]
+      }
+    },
+    "/restaurants/{id}": {
+      "get": {
+        "summary": "Get restaurant details",
+        "tags": [
+          "Restaurants"
+        ]
+      },
+      "patch": {
+        "summary": "Update a restaurant (owner/admin)",
+        "tags": [
+          "Restaurants"
+        ]
+      },
+      "delete": {
+        "summary": "Delete a restaurant (owner/admin)",
+        "tags": [
+          "Restaurants"
+        ]
+      }
+    },
+    "/restaurants/{id}/menu": {
+      "get": {
+        "summary": "Browse a restaurant's menu grouped by category",
+        "tags": [
+          "Restaurants"
+        ]
+      }
+    },
+    "/restaurants/{id}/images": {
+      "patch": {
+        "summary": "Upload restaurant logo/cover image (owner/admin)",
+        "tags": [
+          "Restaurants"
+        ]
+      }
+    },
+    "/restaurants/{id}/dashboard": {
+      "get": {
+        "summary": "Restaurant owner dashboard statistics (owner/admin)",
+        "tags": [
+          "Restaurants"
+        ]
+      }
+    },
+    "/payments/{id}": {
+      "get": {
+        "summary": "Get a payment record (order owner or admin)",
+        "tags": [
+          "Payments"
+        ]
+      }
+    },
+    "/payments/razorpay/verify": {
+      "post": {
+        "summary": "Verify a completed Razorpay checkout and mark the payment paid",
+        "tags": [
+          "Payments"
+        ]
+      }
+    },
+    "/orders": {
+      "post": {
+        "summary": "Place an order from the customer's active cart (checkout)",
+        "tags": [
+          "Orders"
+        ]
+      },
+      "get": {
+        "summary": "List orders scoped to the caller's role (customer/restaurantOwner/deliveryPartner see their own; admin sees all)",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "summary": "Get order details and status history (for tracking)",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/orders/{id}/status": {
+      "patch": {
+        "summary": "Update order status (restaurantOwner confirms/prepares/marks ready/cancels; admin can force any transition)",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/notifications": {
+      "get": {
+        "summary": "List the current user's notifications, newest first (includes unreadCount in meta)",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/notifications/{id}/read": {
+      "patch": {
+        "summary": "Mark a single notification as read",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/notifications/read-all": {
+      "patch": {
+        "summary": "Mark every notification for the current user as read",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/menu-items": {
+      "get": {
+        "summary": "Search/filter menu items across restaurants (name/description search, veg, price range, sorting, pagination)",
+        "tags": [
+          "MenuItems"
+        ]
+      },
+      "post": {
+        "summary": "Create a menu item (owner/admin)",
+        "tags": [
+          "MenuItems"
+        ]
+      }
+    },
+    "/menu-items/{id}": {
+      "get": {
+        "summary": "Get a menu item",
+        "tags": [
+          "MenuItems"
+        ]
+      },
+      "patch": {
+        "summary": "Update a menu item (owner/admin)",
+        "tags": [
+          "MenuItems"
+        ]
+      },
+      "delete": {
+        "summary": "Delete a menu item (owner/admin)",
+        "tags": [
+          "MenuItems"
+        ]
+      }
+    },
+    "/menu-items/{id}/image": {
+      "patch": {
+        "summary": "Upload a menu item image (owner/admin)",
+        "tags": [
+          "MenuItems"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Liveness/readiness probe",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/delivery/profile": {
+      "get": {
+        "summary": "Get the delivery partner's own profile",
+        "tags": [
+          "Delivery"
+        ]
+      },
+      "patch": {
+        "summary": "Update vehicle/profile details",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/delivery/availability": {
+      "patch": {
+        "summary": "Toggle availability to receive new deliveries",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/delivery/location": {
+      "patch": {
+        "summary": "Update the delivery partner's live location",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/delivery/orders/available": {
+      "get": {
+        "summary": "List unassigned orders ready for pickup",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/delivery/orders/assigned": {
+      "get": {
+        "summary": "List orders currently assigned to this delivery partner",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/delivery/orders/history": {
+      "get": {
+        "summary": "List this delivery partner's completed/cancelled deliveries",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/delivery/orders/{id}/accept": {
+      "patch": {
+        "summary": "Accept (self-assign) a ready-for-pickup order",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/delivery/orders/{id}/picked-up": {
+      "patch": {
+        "summary": "Mark an assigned order as picked up from the restaurant",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/delivery/orders/{id}/out-for-delivery": {
+      "patch": {
+        "summary": "Mark a picked-up order as out for delivery",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/delivery/orders/{id}/delivered": {
+      "patch": {
+        "summary": "Mark an order as delivered (also settles a pending Cash on Delivery payment)",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/categories": {
+      "get": {
+        "summary": "List categories for a restaurant",
+        "tags": [
+          "Categories"
+        ]
+      },
+      "post": {
+        "summary": "Create a menu category (owner/admin)",
+        "tags": [
+          "Categories"
+        ]
+      }
+    },
+    "/categories/{id}": {
+      "patch": {
+        "summary": "Update a menu category (owner/admin)",
+        "tags": [
+          "Categories"
+        ]
+      },
+      "delete": {
+        "summary": "Delete a menu category — fails if it still has menu items (owner/admin)",
+        "tags": [
+          "Categories"
+        ]
+      }
+    },
+    "/cart": {
+      "get": {
+        "summary": "Get the current customer's active cart",
+        "tags": [
+          "Cart"
+        ]
+      },
+      "delete": {
+        "summary": "Clear the current customer's cart",
+        "tags": [
+          "Cart"
+        ]
+      }
+    },
+    "/cart/items": {
+      "post": {
+        "summary": "Add an item to the cart (replaces cart if switching restaurants)",
+        "tags": [
+          "Cart"
+        ]
+      }
+    },
+    "/cart/items/{itemId}": {
+      "patch": {
+        "summary": "Update a cart item's quantity",
+        "tags": [
+          "Cart"
+        ]
+      },
+      "delete": {
+        "summary": "Remove an item from the cart",
+        "tags": [
+          "Cart"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "summary": "Register a new user (customer, restaurantOwner, or deliveryPartner)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Log in with email and password",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/refresh-token": {
+      "post": {
+        "summary": "Rotate the refresh token and issue a new access token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "Invalidate the current refresh token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "summary": "Get the current authenticated user's profile",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/bootstrap-admin": {
+      "post": {
+        "summary": "Create the first admin account, or promote an existing account to admin (secret-gated)",
+        "description": "Disabled unless ADMIN_BOOTSTRAP_SECRET is set on the server. Exists so an admin account can be created on platforms without shell access (e.g. a Render web service) without exposing admin as a public self-registration role.\n",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/admin/dashboard": {
+      "get": {
+        "summary": "Platform-wide analytics (users by role, restaurant approvals, orders by status, revenue)",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "summary": "List all users (search by name/email, filter by role, paginate/sort)",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/users/{id}/status": {
+      "patch": {
+        "summary": "Activate or deactivate a user (customer, restaurantOwner, or deliveryPartner)",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/restaurants": {
+      "get": {
+        "summary": "List all restaurants including unapproved ones",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/restaurants/{id}/approve": {
+      "patch": {
+        "summary": "Approve or revoke approval for a restaurant to go live",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/delivery-partners": {
+      "get": {
+        "summary": "List all delivery partner profiles",
+        "tags": [
+          "Admin"
+        ]
+      }
+    }
+  },
+  "tags": []
+}

@@ -137,8 +137,39 @@ Visit `http://localhost:5173`. Swagger UI is at `http://localhost:5000/docs`.
 ### Creating an admin account
 
 Admins can't self-register through the signup form by design — there's no public "become an
-admin" option (see [ARCHITECTURE.md §6](./ARCHITECTURE.md#6-authentication-strategy)). Two ways to
-create one, depending on whether you have shell access to the backend:
+admin" option (see [ARCHITECTURE.md §6](./ARCHITECTURE.md#6-authentication-strategy)).
+
+**Demo admin account** (for trying out the deployed app / grading — log in on the live site and
+the "Admin" role's sidebar will show Dashboard, Customers, Restaurants, Delivery Partners, Orders,
+and Analytics):
+
+| Field | Value |
+|---|---|
+| Email | `feastflow@admin.com` |
+| Password | `Feastflow@admin.com` |
+
+> ⚠️ This is a real, live credential for the deployed database, and it's now in git history — treat
+> it as public. There's no self-service "change password" feature yet (see
+> [Future improvements](#future-improvements)), so rotating it means updating the database
+> directly:
+> ```bash
+> node -e "
+> require('dotenv').config();
+> const mongoose = require('mongoose');
+> const bcrypt = require('bcryptjs');
+> mongoose.connect(process.env.MONGO_URI).then(async () => {
+>   const hash = await bcrypt.hash('a-new-strong-password', 10);
+>   await mongoose.connection.db.collection('users').updateOne(
+>     { email: 'feastflow@admin.com' }, { \$set: { password: hash } }
+>   );
+>   process.exit(0);
+> });"
+> ```
+> Do this before relying on this account for anything beyond a demo, and definitely before putting
+> any real user data behind it.
+
+Two ways to create your **own** admin instead, depending on whether you have shell access to the
+backend:
 
 **Option A — HTTP endpoint (no shell access needed; use this for Render, or anywhere you can't run
 a script directly).** Set `ADMIN_BOOTSTRAP_SECRET` to a long random value
@@ -379,7 +410,6 @@ There is currently no automated browser (Playwright/Cypress) suite — see
 | Checkout with "Pay online" does nothing / no popup appears | The Razorpay checkout script failed to load (ad blocker, offline) — check the browser console; `utils/razorpay.js` throws a clear error in this case |
 | `POST /orders` (Razorpay) returns 400 "Could not initiate payment" | `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are missing or wrong on the backend, or you're mixing live and test mode keys — check the backend logs for the underlying Razorpay API error |
 | `POST /payments/razorpay/verify` returns 400 | Signature mismatch — almost always means `RAZORPAY_KEY_SECRET` differs between when the order was created and when it's being verified (e.g. you changed it mid-checkout) |
-| Checkout randomly fails with "Payment failed" | Expected — the mock payment gateway simulates an ~8% decline rate for non-Cash-on-Delivery methods; just retry |
 | Image uploads 400 | Only JPEG/PNG/WEBP under 2MB are accepted (`middlewares/upload.middleware.js`) |
 | `docker compose logs backend` shows nothing | Fixed in this pass — older images only logged to a file in production; rebuild the backend image to pick up stdout logging |
 
@@ -387,6 +417,12 @@ There is currently no automated browser (Playwright/Cypress) suite — see
 
 Deliberate scope cuts and genuine next steps, not oversights:
 
+- **Self-service password change/reset** — no user (customer, owner, delivery partner, or admin)
+  can currently change their own password through the app; it can only be set at registration or
+  by writing to the database directly. A `PATCH /users/me/password` endpoint (current password +
+  new password, or a forgot-password email flow) is a real gap, not just a nice-to-have — the demo
+  admin account's password (see [Creating an admin account](#creating-an-admin-account)) can only
+  be rotated by a direct database update today.
 - **Razorpay webhooks** — payment confirmation currently relies entirely on the client calling
   `POST /payments/razorpay/verify` after Checkout succeeds. If a customer closes the tab/app after
   paying but before that call fires, the payment stays `pending` on our side even though Razorpay
